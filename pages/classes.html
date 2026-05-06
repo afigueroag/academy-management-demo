@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clases — AcademiaPro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireAuth();
+const user = Auth.getCurrentUser();
+Utils.renderAppLayout('Clases', 'classes');
+const main = document.getElementById('app-main');
+
+/* ================================================================
+   STUDENT VIEW
+   ================================================================ */
+function buildStudentClasses(u) {
+  const myEnrollments = MOCK_DB.enrollments.filter(e => e.student_id === u.id);
+  const myClassIds = myEnrollments.filter(e => e.status === 'active' || e.status === 'waiting').map(e => e.class_id);
+  const studentCats = u.categories || [];
+
+  // Filter classes by student categories
+  const availableClasses = MOCK_DB.classes.filter(c => {
+    if (c.status !== 'active') return false;
+    if (studentCats.length === 0) return true;
+    return c.categories.some(catId => studentCats.includes(catId));
+  });
+
+  function buildClassCard(cls, enrollment) {
+    const instructor = DB.getUser(cls.instructor_id);
+    const enrolled = DB.getEnrollmentsForClass(cls.id).length;
+    const waitlist = MOCK_DB.enrollments.filter(e => e.class_id === cls.id && e.status === 'waiting').length;
+    const isFull = cls.max_students && enrolled >= cls.max_students;
+    const pct = cls.max_students ? Math.min(100, Math.round(enrolled / cls.max_students * 100)) : 0;
+    const myEnroll = myEnrollments.find(e => e.class_id === cls.id);
+
+    let ctaButton = '';
+    if (myEnroll?.status === 'active') {
+      const pendingTxn = MOCK_DB.transactions.find(t => t.student_id === u.id && t.class_id === cls.id && t.status === 'pending');
+      ctaButton = `
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <span class="badge badge-success">Inscrito ✓</span>
+          ${pendingTxn ? `<button class="btn btn-primary btn-sm" onclick="openPayModal('${pendingTxn.id}','${cls.name}',${pendingTxn.amount})">Pagar ${Utils.formatCurrency(pendingTxn.amount)}</button>` : ''}
+          <button class="btn btn-outline-danger btn-sm" onclick="cancelEnroll('${myEnroll.id}','${cls.name}')">Cancelar</button>
+        </div>`;
+    } else if (myEnroll?.status === 'waiting') {
+      ctaButton = `<span class="badge badge-warning">Lista de espera #${myEnroll.waiting_position}</span>`;
+    } else if (isFull) {
+      ctaButton = `<button class="btn btn-outline btn-sm" onclick="joinWaitlist('${cls.id}','${cls.name}')">Unirse a lista de espera</button>`;
+    } else {
+      ctaButton = `<button class="btn btn-primary btn-sm" onclick="enrollInClass('${cls.id}','${cls.name}',${cls.price})">Inscribirse — ${Utils.formatCurrency(cls.price||0)}</button>`;
+    }
+
+    return `
+    <div class="card" style="transition:box-shadow var(--transition)">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-3)">
+          <h3 style="font-size:var(--font-size-base)">${cls.name}</h3>
+          <span class="badge ${myEnroll?.status==='active'?'badge-success':isFull?'badge-warning':'badge-gray'}">${myEnroll?.status==='active'?'Inscrito':isFull&&!myEnroll?'Lleno':'Disponible'}</span>
+        </div>
+        <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:var(--space-3)">${cls.description||''}</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4)">
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm)">
+            <span>📅</span><span>${Utils.dayLabel(cls.schedule_day)} · ${Utils.formatTime(cls.schedule_time)} · ${cls.duration_minutes} min</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm)">
+            <span>📍</span><span>${cls.location}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm)">
+            ${instructor ? Utils.avatarHtml(instructor,'xs') : ''}<span>${instructor?instructor.first_name+' '+instructor.last_name:'—'}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)">
+          ${cls.categories.map(cid => Utils.categoryChip(cid)).join('')}
+        </div>
+        ${cls.max_students ? `
+        <div style="margin-bottom:var(--space-3)">
+          <div style="display:flex;justify-content:space-between;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:4px">
+            <span>${enrolled}/${cls.max_students} inscritos${waitlist>0?` · ${waitlist} en espera`:''}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill ${pct>=90?'danger':pct>=70?'warning':'success'}" style="width:${pct}%"></div></div>
+        </div>` : ''}
+        ${ctaButton}
+      </div>
+    </div>`;
+  }
+
+  const myActiveEnrollments = myEnrollments.filter(e => e.status === 'active' || e.status === 'waiting');
+
+  const myEnrollmentRows = myActiveEnrollments.length === 0
+    ? `<div class="empty-state"><div class="empty-state-icon">📚</div><h3>Sin inscripciones activas</h3><p>Ve a la pestaña "Explorar" para encontrar clases disponibles.</p></div>`
+    : myActiveEnrollments.map(e => {
+        const cls = DB.getClass(e.class_id);
+        const instructor = cls ? DB.getUser(cls.instructor_id) : null;
+        const pendingTxn = MOCK_DB.transactions.find(t => t.student_id === u.id && t.class_id === e.class_id && t.status === 'pending');
+        const attRecords = MOCK_DB.attendance.filter(a => a.class_id === e.class_id && a.user_id === u.id);
+        const attRate = attRecords.length ? Math.round(attRecords.filter(a=>a.status==='present').length/attRecords.length*100) : 0;
+        return `
+        <tr>
+          <td>
+            <div style="font-weight:600">${cls?.name||'—'}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${cls?Utils.dayLabel(cls.schedule_day)+' · '+Utils.formatTime(cls.schedule_time):'—'}</div>
+          </td>
+          <td>${instructor ? `<div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(instructor,'xs')}<span style="font-size:var(--font-size-sm)">${instructor.first_name} ${instructor.last_name}</span></div>` : '—'}</td>
+          <td>${e.status === 'waiting' ? `<span class="badge badge-warning">Espera #${e.waiting_position}</span>` : `<span class="badge badge-success">Activo</span>`}</td>
+          <td>${pendingTxn ? `<span class="badge badge-danger">Pendiente ${Utils.formatCurrency(pendingTxn.amount)}</span>` : `<span class="badge badge-success">Al corriente</span>`}</td>
+          <td>${attRecords.length > 0 ? `<span style="font-weight:600;color:${attRate>=80?'var(--color-success)':attRate>=60?'var(--color-warning)':'var(--color-danger)'}">${attRate}%</span>` : '—'}</td>
+          <td>
+            <div class="actions">
+              ${pendingTxn ? `<button class="btn btn-primary btn-xs" onclick="openPayModal('${pendingTxn.id}','${cls?.name}',${pendingTxn.amount})">Pagar</button>` : ''}
+              <button class="btn btn-outline-danger btn-xs" onclick="cancelEnroll('${e.id}','${cls?.name}')">Cancelar</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Clases</h2>
+    <p class="page-subtitle">Explora y gestiona tus inscripciones · Tu plan: ${(u.categories||[]).map(cid=>{const c=DB.getCategory(cid);return c?`<strong>${c.name}</strong>`:''}).join(', ')||'Sin categoría'}</p>
+  </div>
+
+  <div class="tabs" id="class-tabs">
+    <button class="tab active" data-tab="tab-explore">🔍 Explorar clases</button>
+    <button class="tab" data-tab="tab-enrolled">📋 Mis inscripciones (${myActiveEnrollments.length})</button>
+  </div>
+
+  <div id="tab-explore" class="tab-content active">
+    ${availableClasses.length === 0
+      ? `<div class="empty-state"><div class="empty-state-icon">🏷️</div><h3>No hay clases disponibles</h3><p>Tu plan actual no incluye acceso a clases disponibles. Contacta al administrador para cambiar tu categoría.</p></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-5)">${availableClasses.map(cls => buildClassCard(cls, myEnrollments.find(e=>e.class_id===cls.id))).join('')}</div>`}
+  </div>
+
+  <div id="tab-enrolled" class="tab-content">
+    <div class="table-wrapper">
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr><th>Clase</th><th>Instructor</th><th>Estado</th><th>Pago</th><th>Asistencia</th><th style="text-align:right">Acciones</th></tr></thead>
+          <tbody>${myEnrollmentRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   INSTRUCTOR VIEW
+   ================================================================ */
+function buildInstructorClasses(u) {
+  const myClasses = DB.getInstructorClasses(u.id);
+  const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const todayDay = dayNames[new Date().getDay()];
+
+  const classItems = myClasses.length === 0
+    ? `<div class="empty-state"><div class="empty-state-icon">🧑‍🏫</div><h3>Sin clases asignadas</h3><p>El administrador te asignará clases próximamente.</p></div>`
+    : myClasses.map(cls => {
+        const enrolled = DB.getEnrollmentsForClass(cls.id);
+        const isToday = cls.schedule_day === todayDay;
+        const todayAtt = MOCK_DB.attendance.filter(a => a.class_id === cls.id && a.session_date === new Date().toISOString().split('T')[0]);
+        const hasAttendanceToday = todayAtt.length > 0;
+        return `
+        <div class="card" style="margin-bottom:var(--space-4)">
+          <div class="card-header">
+            <div>
+              <h3 style="display:flex;align-items:center;gap:var(--space-2)">
+                ${cls.name}
+                ${isToday ? '<span class="badge badge-primary">HOY</span>' : ''}
+              </h3>
+              <div style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin-top:4px">
+                📅 ${Utils.dayLabel(cls.schedule_day)} · ${Utils.formatTime(cls.schedule_time)} · ${cls.duration_minutes} min &nbsp;|&nbsp;
+                📍 ${cls.location}
+              </div>
+            </div>
+            <div style="display:flex;gap:var(--space-2)">
+              ${isToday && !hasAttendanceToday ? `<button class="btn btn-primary btn-sm" onclick="openAttModal('${cls.id}')">📋 Tomar asistencia</button>` : ''}
+              ${hasAttendanceToday ? `<button class="btn btn-success btn-sm" onclick="openAttModal('${cls.id}')">✅ Asistencia tomada · Editar</button>` : ''}
+              ${!isToday ? `<button class="btn btn-outline btn-sm" onclick="openAttModal('${cls.id}')">📋 Asistencia</button>` : ''}
+            </div>
+          </div>
+          <div class="card-body" style="padding-top:var(--space-4)">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-bottom:var(--space-4)">
+              <div style="text-align:center">
+                <div style="font-size:var(--font-size-2xl);font-weight:700">${enrolled.length}</div>
+                <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Inscritos de ${cls.max_students||'∞'}</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:var(--font-size-2xl);font-weight:700">${todayAtt.filter(a=>a.status==='present').length}</div>
+                <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Presentes hoy</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:var(--font-size-2xl);font-weight:700">${cls.categories.length}</div>
+                <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Categorías</div>
+              </div>
+            </div>
+
+            ${enrolled.length > 0 ? `
+            <div style="border-top:1px solid var(--color-border);padding-top:var(--space-4)">
+              <div style="font-size:var(--font-size-sm);font-weight:600;margin-bottom:var(--space-3)">Roster de alumnos</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-3)">
+                ${enrolled.map(e => {
+                  const student = DB.getUser(e.student_id);
+                  if (!student) return '';
+                  const attRecords = MOCK_DB.attendance.filter(a => a.class_id === cls.id && a.user_id === student.id);
+                  const rate = attRecords.length ? Math.round(attRecords.filter(a=>a.status==='present').length/attRecords.length*100) : 0;
+                  return `
+                  <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2);border-radius:var(--radius);background:var(--color-gray-50)">
+                    ${Utils.avatarHtml(student,'sm')}
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:var(--font-size-xs);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${student.first_name} ${student.last_name}</div>
+                      <div style="font-size:10px;color:${rate>=80?'var(--color-success)':rate>=60?'var(--color-warning)':'var(--color-danger)'}">${rate}% asistencia</div>
+                    </div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Mis Clases</h2>
+    <p class="page-subtitle">${myClasses.length} clases activas · ${myClasses.reduce((s,c)=>s+DB.getEnrollmentsForClass(c.id).length,0)} alumnos en total</p>
+  </div>
+  ${classItems}`;
+}
+
+/* ================================================================
+   ADMIN / RECEPTIONIST VIEW
+   ================================================================ */
+function buildAdminClasses(u) {
+  const allClasses = MOCK_DB.classes;
+  const [filterStatus, setFilterStatus] = [{ value: 'all' }, v => { filterStatus.value = v; renderAdminTable(); }];
+
+  const tableId = 'classes-admin-table';
+  function renderAdminTable() {
+    const filtered = filterStatus.value === 'all' ? allClasses : allClasses.filter(c => c.status === filterStatus.value);
+    const tbody = document.getElementById(tableId + '-body');
+    if (!tbody) return;
+    tbody.innerHTML = filtered.map(cls => {
+      const instructor = DB.getUser(cls.instructor_id);
+      const enrolled = DB.getEnrollmentsForClass(cls.id).length;
+      return `
+      <tr>
+        <td><div style="font-weight:600">${cls.name}</div><div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${cls.categories.map(cid=>Utils.categoryChip(cid)).join(' ')}</div></td>
+        <td>${instructor?`<div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(instructor,'xs')}<span style="font-size:var(--font-size-sm)">${instructor.first_name} ${instructor.last_name}</span></div>`:'—'}</td>
+        <td style="font-size:var(--font-size-sm)">${Utils.dayLabel(cls.schedule_day)} · ${Utils.formatTime(cls.schedule_time)}</td>
+        <td style="text-align:center"><strong>${enrolled}</strong>${cls.max_students?`/${cls.max_students}`:''}</td>
+        <td>${Utils.formatCurrency(cls.price||0)}</td>
+        <td><span class="badge ${Utils.statusBadgeClass(cls.status)}">${Utils.statusLabel(cls.status)}</span></td>
+        <td>
+          <div class="actions">
+            <button class="btn btn-outline btn-xs" onclick="openEditClassModal('${cls.id}')">Editar</button>
+            ${u.role==='admin'?`<button class="btn btn-outline btn-xs" onclick="toggleArchive('${cls.id}','${cls.name}','${cls.status}')">${cls.status==='archived'?'Activar':'Archivar'}</button>`:''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin clases</td></tr>';
+  }
+
+  setTimeout(renderAdminTable, 0);
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Clases</h2>
+    <p class="page-subtitle">${allClasses.filter(c=>c.status==='active').length} activas · ${allClasses.filter(c=>c.status==='archived').length} archivadas</p>
+  </div>
+
+  <div class="toolbar">
+    <div class="filter-chips">
+      <button class="filter-chip active" onclick="setFilterStatus('all');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Todas</button>
+      <button class="filter-chip" onclick="setFilterStatus('active');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Activas</button>
+      <button class="filter-chip" onclick="setFilterStatus('draft');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Borradores</button>
+      <button class="filter-chip" onclick="setFilterStatus('archived');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Archivadas</button>
+    </div>
+    ${u.role==='admin' ? `<button class="btn btn-primary btn-sm ml-auto" onclick="openNewClassModal()">+ Nueva clase</button>` : ''}
+  </div>
+
+  <div class="table-wrapper">
+    <div class="table-responsive">
+      <table class="table" id="${tableId}">
+        <thead><tr><th>Clase</th><th>Instructor</th><th>Horario</th><th style="text-align:center">Inscritos</th><th>Precio</th><th>Estado</th><th style="text-align:right">Acciones</th></tr></thead>
+        <tbody id="${tableId}-body"></tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+switch(user.role) {
+  case 'student':      main.innerHTML = buildStudentClasses(user); break;
+  case 'instructor':   main.innerHTML = buildInstructorClasses(user); break;
+  default:             main.innerHTML = buildAdminClasses(user); break;
+}
+Utils.initTabs('app-main');
+
+/* ================================================================
+   SHARED ACTIONS
+   ================================================================ */
+
+// STUDENT: Enroll
+function enrollInClass(classId, className, price) {
+  Utils.openModal('enroll-confirm-modal') || (() => {
+    let modal = document.getElementById('enroll-confirm-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'enroll-confirm-modal';
+      modal.className = 'modal-backdrop';
+      modal.innerHTML = `
+        <div class="modal modal-sm">
+          <div class="modal-header"><h3 class="modal-title">Confirmar inscripción</h3><button class="modal-close" onclick="Utils.closeModal('enroll-confirm-modal')">✕</button></div>
+          <div class="modal-body">
+            <p style="margin-bottom:var(--space-3)">¿Inscribirse en <strong id="enroll-class-name"></strong>?</p>
+            <div class="alert alert-info" style="font-size:var(--font-size-sm)">
+              <span class="alert-icon">💳</span>
+              <div>Costo: <strong id="enroll-price"></strong>. Se generará un cargo pendiente que deberás pagar.</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="Utils.closeModal('enroll-confirm-modal')">Cancelar</button>
+            <button class="btn btn-primary" id="enroll-confirm-btn">Confirmar inscripción</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('enroll-confirm-modal'); });
+    }
+    modal._classId = classId; modal._price = price;
+    document.getElementById('enroll-class-name').textContent = className;
+    document.getElementById('enroll-price').textContent = Utils.formatCurrency(price);
+    document.getElementById('enroll-confirm-btn').onclick = doEnroll;
+    Utils.openModal('enroll-confirm-modal');
+  })();
+}
+
+function doEnroll() {
+  const modal = document.getElementById('enroll-confirm-modal');
+  const enrollment = DB.enrollStudent(user.id, modal._classId);
+  if (enrollment.status === 'waiting') {
+    Utils.toast('En lista de espera', `Posición #${enrollment.waiting_position}. Te notificaremos cuando haya espacio.`, 'warning');
+  } else {
+    DB.addTransaction({ type:'income', category:'enrollment', subcategory:'Mensualidad', amount: modal._price, status:'pending', payment_method:null, student_id:user.id, class_id:modal._classId, due_date:new Date().toISOString().split('T')[0], paid_at:null, notes:null });
+    Utils.toast('Inscripción exitosa', 'Tienes un pago pendiente. Puedes pagarlo desde la sección de Inicio.', 'success');
+  }
+  Utils.closeModal('enroll-confirm-modal');
+  setTimeout(() => location.reload(), 700);
+}
+
+// STUDENT: Join waitlist
+function joinWaitlist(classId, className) {
+  const enrollment = DB.enrollStudent(user.id, classId);
+  Utils.toast('Agregado a lista de espera', `Posición #${enrollment.waiting_position} en ${className}.`, 'info');
+  setTimeout(() => location.reload(), 700);
+}
+
+// STUDENT: Cancel enrollment
+function cancelEnroll(enrollmentId, className) {
+  if (!confirm(`¿Cancelar inscripción en ${className}?`)) return;
+  DB.cancelEnrollment(enrollmentId);
+  Utils.toast('Inscripción cancelada', `Se canceló tu inscripción en ${className}.`, 'warning');
+  setTimeout(() => location.reload(), 700);
+}
+
+// STUDENT: Pay
+function openPayModal(txnId, className, amount) {
+  let modal = document.getElementById('pay-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'pay-modal';
+    modal.className = 'modal-backdrop';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header"><h3 class="modal-title">💳 Pago seguro — Stripe</h3><button class="modal-close" onclick="Utils.closeModal('pay-modal')">✕</button></div>
+        <div class="modal-body">
+          <div class="alert alert-primary" style="margin-bottom:var(--space-5)">
+            <span class="alert-icon">ℹ️</span><div>Demo: ingresa cualquier datos de tarjeta para simular el pago.</div>
+          </div>
+          <div style="text-align:center;padding:var(--space-4);background:var(--color-gray-50);border-radius:var(--radius-lg);margin-bottom:var(--space-5)">
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Total a pagar</div>
+            <div id="modal-pay-amount" style="font-size:2rem;font-weight:700;color:var(--color-primary)"></div>
+            <div id="modal-pay-class" style="font-size:var(--font-size-sm);color:var(--color-text-secondary)"></div>
+          </div>
+          <div class="form-group">
+            <label class="label">Número de tarjeta</label>
+            <div class="input-group">
+              <span class="input-group-icon">💳</span>
+              <input type="text" class="input" placeholder="4242 4242 4242 4242" maxlength="19" oninput="this.value=this.value.replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim().substr(0,19)">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin:0">
+              <label class="label">Expiración</label>
+              <input type="text" class="input" placeholder="MM/AA" maxlength="5">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="label">CVC</label>
+              <input type="text" class="input" placeholder="•••" maxlength="3">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="Utils.closeModal('pay-modal')">Cancelar</button>
+          <button class="btn btn-primary" id="pay-btn-confirm" onclick="processPayment()">🔒 Pagar ahora</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('pay-modal'); });
+  }
+  modal._txnId = txnId;
+  document.getElementById('modal-pay-amount').textContent = Utils.formatCurrency(amount);
+  document.getElementById('modal-pay-class').textContent = className;
+  Utils.openModal('pay-modal');
+}
+
+function processPayment() {
+  const btn = document.getElementById('pay-btn-confirm');
+  btn.classList.add('loading'); btn.disabled = true;
+  const modal = document.getElementById('pay-modal');
+  setTimeout(() => {
+    const txn = MOCK_DB.transactions.find(t => t.id === modal._txnId);
+    if (txn) { txn.status = 'succeeded'; txn.paid_at = new Date().toISOString(); txn.payment_method = 'stripe'; }
+    Utils.closeModal('pay-modal');
+    Utils.toast('¡Pago exitoso!', 'Tu pago fue procesado correctamente por Stripe.', 'success');
+    setTimeout(() => location.reload(), 800);
+  }, 1500);
+}
+
+// INSTRUCTOR: Attendance modal
+function openAttModal(classId) {
+  const cls = DB.getClass(classId);
+  const enrollments = DB.getEnrollmentsForClass(classId);
+  const today = new Date().toISOString().split('T')[0];
+  const existing = {};
+  MOCK_DB.attendance.filter(a => a.class_id === classId && a.session_date === today).forEach(a => existing[a.user_id] = a.status);
+
+  let modal = document.getElementById('att-modal-c');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'att-modal-c';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('att-modal-c'); });
+  }
+  modal._classId = classId;
+  modal._attendance = {};
+  enrollments.forEach(e => { modal._attendance[e.student_id] = existing[e.student_id] || 'present'; });
+
+  const rows = enrollments.map(e => {
+    const s = DB.getUser(e.student_id);
+    if (!s) return '';
+    const cur = modal._attendance[s.id];
+    return `
+    <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);border-bottom:1px solid var(--color-border-light)" id="attc-${s.id}">
+      ${Utils.avatarHtml(s,'sm')}
+      <span style="flex:1;font-size:var(--font-size-sm);font-weight:500">${s.first_name} ${s.last_name}</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-xs attc-btn ${cur==='present'?'btn-success':'btn-outline'}" data-st="${s.id}" data-val="present" onclick="setAttC(this)">✓</button>
+        <button class="btn btn-xs attc-btn ${cur==='absent'?'btn-danger':'btn-outline'}" data-st="${s.id}" data-val="absent" onclick="setAttC(this)">✗</button>
+        <button class="btn btn-xs attc-btn ${cur==='excused'?'btn-secondary':'btn-outline'}" data-st="${s.id}" data-val="excused" onclick="setAttC(this)">~</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div><h3 class="modal-title">📋 Asistencia — ${cls?.name}</h3>
+        <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${enrollments.length} alumnos inscritos</div></div>
+        <button class="modal-close" onclick="Utils.closeModal('att-modal-c')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4)">
+          <label class="label" style="margin:0">Fecha:</label>
+          <input type="date" class="input" id="attc-date" value="${today}" style="max-width:180px">
+          <div style="display:flex;gap:var(--space-2);font-size:var(--font-size-xs)">
+            <span class="badge badge-success">✓ Presente</span>
+            <span class="badge badge-danger">✗ Ausente</span>
+            <span class="badge badge-secondary">~ Justificado</span>
+          </div>
+        </div>
+        <div style="max-height:350px;overflow-y:auto">${rows||'<div style="text-align:center;padding:var(--space-6)">Sin alumnos inscritos</div>'}</div>
+      </div>
+      <div class="modal-footer">
+        <span id="attc-summary" style="margin-right:auto;font-size:var(--font-size-xs);color:var(--color-text-secondary)"></span>
+        <button class="btn btn-outline" onclick="Utils.closeModal('att-modal-c')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveAttC()">Guardar asistencia</button>
+      </div>
+    </div>`;
+  updateAttcSummary();
+  Utils.openModal('att-modal-c');
+}
+
+function setAttC(btn) {
+  const modal = document.getElementById('att-modal-c');
+  const studentId = btn.dataset.st;
+  const val = btn.dataset.val;
+  modal._attendance[studentId] = val;
+  const row = document.getElementById('attc-' + studentId);
+  if (row) {
+    row.querySelectorAll('.attc-btn').forEach(b => { b.classList.remove('btn-success','btn-danger','btn-secondary'); b.classList.add('btn-outline'); });
+    btn.classList.remove('btn-outline');
+    if (val === 'present') btn.classList.add('btn-success');
+    else if (val === 'absent') btn.classList.add('btn-danger');
+    else btn.classList.add('btn-secondary');
+  }
+  updateAttcSummary();
+}
+
+function updateAttcSummary() {
+  const modal = document.getElementById('att-modal-c');
+  const el = document.getElementById('attc-summary');
+  if (!el || !modal) return;
+  const vals = Object.values(modal._attendance || {});
+  el.textContent = `${vals.filter(v=>v==='present').length} presentes · ${vals.filter(v=>v==='absent').length} ausentes · ${vals.filter(v=>v==='excused').length} justificados`;
+}
+
+function saveAttC() {
+  const modal = document.getElementById('att-modal-c');
+  const date = document.getElementById('attc-date').value;
+  Object.entries(modal._attendance).forEach(([userId, status]) => {
+    const ex = MOCK_DB.attendance.find(a => a.class_id === modal._classId && a.user_id === userId && a.session_date === date);
+    if (ex) { ex.status = status; } else {
+      MOCK_DB.attendance.push({ id:'att_x'+Date.now(), class_id:modal._classId, user_id:userId, session_date:date, status, notes:null, created_at:new Date().toISOString() });
+    }
+  });
+  Utils.closeModal('att-modal-c');
+  Utils.toast('Asistencia guardada', `Sesión del ${Utils.formatDate(date)} registrada.`, 'success');
+  setTimeout(() => location.reload(), 700);
+}
+
+// ADMIN: Toggle archive
+function toggleArchive(classId, className, currentStatus) {
+  const newStatus = currentStatus === 'archived' ? 'active' : 'archived';
+  const cls = DB.getClass(classId);
+  if (cls) cls.status = newStatus;
+  Utils.toast(newStatus === 'archived' ? 'Clase archivada' : 'Clase activada', className, 'success');
+  setTimeout(() => location.reload(), 700);
+}
+
+// ADMIN: New class modal (simple)
+function openNewClassModal() {
+  let modal = document.getElementById('new-class-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'new-class-modal';
+    modal.className = 'modal-backdrop';
+    const instructors = DB.getInstructors();
+    const catOptions = MOCK_DB.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const instrOptions = instructors.map(i => `<option value="${i.id}">${i.first_name} ${i.last_name}</option>`).join('');
+    modal.innerHTML = `
+      <div class="modal modal-lg">
+        <div class="modal-header"><h3 class="modal-title">Nueva clase</h3><button class="modal-close" onclick="Utils.closeModal('new-class-modal')">✕</button></div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group" style="margin:0"><label class="label label-required">Nombre</label><input type="text" class="input" id="nc-name" placeholder="ej. Ballet Avanzado"></div>
+            <div class="form-group" style="margin:0"><label class="label label-required">Instructor</label><select class="input select" id="nc-inst">${instrOptions}</select></div>
+          </div>
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0"><label class="label">Día</label><select class="input select" id="nc-day"><option value="monday">Lunes</option><option value="tuesday">Martes</option><option value="wednesday">Miércoles</option><option value="thursday">Jueves</option><option value="friday">Viernes</option><option value="saturday">Sábado</option><option value="sunday">Domingo</option></select></div>
+            <div class="form-group" style="margin:0"><label class="label">Hora</label><input type="time" class="input" id="nc-time" value="10:00"></div>
+          </div>
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0"><label class="label">Duración (min)</label><input type="number" class="input" id="nc-duration" value="60" min="15"></div>
+            <div class="form-group" style="margin:0"><label class="label">Capacidad máx.</label><input type="number" class="input" id="nc-capacity" value="15" min="1"></div>
+          </div>
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0"><label class="label">Precio/mes</label><input type="number" class="input" id="nc-price" placeholder="ej. 600"></div>
+            <div class="form-group" style="margin:0"><label class="label">Ubicación</label><input type="text" class="input" id="nc-location" placeholder="ej. Salón B"></div>
+          </div>
+          <div class="form-group" style="margin-top:var(--space-4)"><label class="label">Descripción</label><textarea class="input" id="nc-desc" rows="2" placeholder="Descripción de la clase..."></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="Utils.closeModal('new-class-modal')">Cancelar</button>
+          <button class="btn btn-primary" onclick="createClass()">Crear clase</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('new-class-modal'); });
+  }
+  Utils.openModal('new-class-modal');
+}
+
+function createClass() {
+  const name = document.getElementById('nc-name').value.trim();
+  if (!name) { Utils.toast('Campo requerido', 'El nombre de la clase es obligatorio.', 'error'); return; }
+  const id = 'class_' + String(MOCK_DB.classes.length + 1).padStart(3,'0');
+  MOCK_DB.classes.push({
+    id, academy_id:'acad_001', name, description: document.getElementById('nc-desc').value,
+    instructor_id: document.getElementById('nc-inst').value, status:'active', recurrence:'weekly',
+    schedule_day: document.getElementById('nc-day').value, schedule_time: document.getElementById('nc-time').value,
+    duration_minutes: parseInt(document.getElementById('nc-duration').value)||60,
+    max_students: parseInt(document.getElementById('nc-capacity').value)||15,
+    price: parseFloat(document.getElementById('nc-price').value)||0,
+    location: document.getElementById('nc-location').value, categories:[], created_at: new Date().toISOString()
+  });
+  Utils.closeModal('new-class-modal');
+  Utils.toast('Clase creada', `La clase "${name}" fue creada exitosamente.`, 'success');
+  setTimeout(() => location.reload(), 700);
+}
+
+function openEditClassModal(classId) {
+  Utils.toast('Editar clase', 'Funcionalidad completa disponible en la Parte 3.', 'info');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Finanzas – Nómina</title>
+    <style>
+        div {
+            border: 1px solid black;
+        }
+        .payroll-charts-row {
+            display: flex;
+        }
+        .payroll-by-type-donut {
+            flex: 1;
+        }
+        .payroll-monthly-bar-chart {
+            flex: 2;
+        }
+    </style>
+</head>
+<body>
+    <!-- (include _layout.html) -->
+    <div class="dashboard-tabs">
+        Resumen (Navigate to dashboard.html) | Ingresos (Navigate to dashboard-ingresos.html) | Gastos (Navigate to dashboard-gastos.html) | P&L (Navigate to dashboard-pl.html) | Nómina (active)
+    </div>
+    <div class="main-content">
+        <div class="scorecards-section">
+            4 tarjetas: Nómina Total del Mes, Empleados Pagados, Pago Promedio por Empleado, Próximo Pago Programado
+        </div>
+        <div class="payroll-list-section">
+            <div class="payroll-list-toolbar">
+                Filtros: por período (period_start/period_end), por rol, por payroll_type (hourly/salary/commission), por estado (pending/succeeded). Búsqueda por nombre.
+                CTA para ingresar nuevo pago de nómina (crea transaction type=expense, category=payroll).
+            </div>
+            <div class="payroll-list">
+                Tabla de transactions con category=payroll: empleado (recipient_id), rol, payroll_type, período (period_start–period_end), monto, payment_method, estado y fecha de pago (paid_at).
+                (Estado vacío) No hay pagos de nómina registrados en el período seleccionado.
+            </div>
+        </div>
+        <div class="payroll-charts-row">
+            <div class="payroll-by-type-donut">
+                Gráfica de dona: distribución del gasto de nómina por payroll_type (hourly/salary/commission).
+            </div>
+            <div class="payroll-monthly-bar-chart">
+                Gráfica de barras: gasto de nómina por mes en el año fiscal actual.
+            </div>
+        </div>
+        <div class="upcoming-payroll-section">
+            Próximos pagos programados: empleado, rol, fecha estimada, monto esperado.
+            (Estado vacío) No hay pagos de nómina próximos programados.
+        </div>
+    </div>
+</body>
+</html>

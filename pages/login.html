@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión — AcademiaPro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body class="auth-layout">
+
+  <header class="auth-header">
+    <a href="../index.html" class="nav-logo">
+      <div class="nav-logo-icon" style="width:32px;height:32px;font-size:18px">🎭</div>
+      AcademiaPro
+    </a>
+    <span style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">
+      ¿No tienes cuenta? <a href="register.html">Crear academia</a>
+    </span>
+  </header>
+
+  <div class="auth-body">
+    <div class="auth-card auth-card-wide">
+
+      <!-- DEMO ROLE SWITCHER — pieza clave para workshops -->
+      <div class="demo-switcher">
+        <div class="demo-switcher-header">
+          <span class="demo-badge">DEMO</span>
+          <div>
+            <div class="demo-switcher-title">Selecciona un rol para explorar</div>
+            <div class="demo-switcher-desc">Ingresa instantáneamente sin contraseña</div>
+          </div>
+        </div>
+        <div class="demo-roles">
+          <button class="demo-role-btn admin" onclick="loginAsRole('admin')">
+            <span class="demo-role-icon">👑</span>
+            <span class="demo-role-name">Admin</span>
+            <span class="demo-role-email">ana@academia.com</span>
+          </button>
+          <button class="demo-role-btn receptionist" onclick="loginAsRole('receptionist')">
+            <span class="demo-role-icon">💼</span>
+            <span class="demo-role-name">Recepcionista</span>
+            <span class="demo-role-email">carlos@academia.com</span>
+          </button>
+          <button class="demo-role-btn instructor" onclick="loginAsRole('instructor')">
+            <span class="demo-role-icon">🧑‍🏫</span>
+            <span class="demo-role-name">Instructor</span>
+            <span class="demo-role-email">maria@academia.com</span>
+          </button>
+          <button class="demo-role-btn student" onclick="loginAsRole('student')">
+            <span class="demo-role-icon">🎓</span>
+            <span class="demo-role-name">Estudiante</span>
+            <span class="demo-role-email">juan@estudiante.com</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="divider-text">o inicia sesión con tu cuenta</div>
+
+      <!-- LOGIN FORM -->
+      <div class="auth-card-header" style="margin-bottom:var(--space-6)">
+        <h1>Iniciar sesión</h1>
+        <p>Ingresa tu correo y contraseña</p>
+      </div>
+
+      <div id="error-alert" class="alert alert-danger" style="display:none;margin-bottom:var(--space-4)">
+        <span class="alert-icon">❌</span>
+        <div class="alert-content">
+          <div class="alert-title" id="error-text">Credenciales incorrectas</div>
+        </div>
+      </div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="label label-required" for="email">Correo electrónico</label>
+          <div class="input-group">
+            <span class="input-group-icon">✉️</span>
+            <input type="email" id="email" class="input" placeholder="tu@academia.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
+            <label class="label" for="password" style="margin:0">Contraseña</label>
+            <a href="password-reset.html" style="font-size:var(--font-size-xs)">¿Olvidaste tu contraseña?</a>
+          </div>
+          <div class="input-group">
+            <span class="input-group-icon">🔒</span>
+            <input type="password" id="password" class="input input-with-suffix" placeholder="••••••••" required autocomplete="current-password">
+            <button type="button" class="input-group-suffix" onclick="togglePassword()" title="Mostrar/ocultar">👁️</button>
+          </div>
+          <div class="form-hint">En el demo, cualquier contraseña funciona para los correos del mock.</div>
+        </div>
+
+        <!-- Academy selector (se muestra si el usuario pertenece a varias academias) -->
+        <div id="academy-selector" class="form-group" style="display:none">
+          <label class="label" for="academy-select">Seleccionar academia</label>
+          <select id="academy-select" class="input select">
+            <option value="acad_001">Academia Arte y Movimiento</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
+          Iniciar sesión
+        </button>
+      </form>
+
+      <div style="margin-top:var(--space-6);text-align:center;font-size:var(--font-size-sm);color:var(--color-text-secondary)">
+        ¿Eres nuevo? <a href="register.html">Registra tu academia gratis</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    /* Redirigir si ya hay sesión */
+    if (Auth.isAuthenticated()) {
+      window.location.href = 'home.html';
+    }
+
+    function loginAsRole(role) {
+      Auth.simulateLogin(role);
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const btn = document.getElementById('submit-btn');
+
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      /* Simula latencia de red */
+      setTimeout(() => {
+        const result = Auth.login(email, 'demo');
+        btn.classList.remove('loading');
+        btn.disabled = false;
+
+        if (result.success) {
+          window.location.href = 'home.html';
+        } else {
+          const alert = document.getElementById('error-alert');
+          document.getElementById('error-text').textContent = result.error;
+          alert.style.display = 'flex';
+          document.getElementById('email').classList.add('error');
+          setTimeout(() => { alert.style.display = 'none'; }, 4000);
+        }
+      }, 600);
+    }
+
+    function togglePassword() {
+      const input = document.getElementById('password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+  </script>
+</body>
+</html>

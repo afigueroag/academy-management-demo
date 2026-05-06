@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificar correo — AcademiaPro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body class="auth-layout">
+
+  <header class="auth-header">
+    <a href="../index.html" class="nav-logo">
+      <div class="nav-logo-icon" style="width:32px;height:32px;font-size:18px">🎭</div>
+      AcademiaPro
+    </a>
+  </header>
+
+  <div class="auth-body">
+    <div class="auth-card" style="text-align:center">
+
+      <!-- Estado: Cargando -->
+      <div id="view-loading" style="padding:var(--space-8) 0">
+        <div class="spinner spinner-lg" style="margin:0 auto var(--space-4)"></div>
+        <h2>Verificando tu correo...</h2>
+        <p style="color:var(--color-text-secondary);margin-top:var(--space-2)">Por favor espera un momento.</p>
+      </div>
+
+      <!-- Estado: Éxito -->
+      <div id="view-success" style="display:none;padding:var(--space-8) 0">
+        <div style="font-size:4rem;margin-bottom:var(--space-4)">✅</div>
+        <h2 style="margin-bottom:var(--space-2)">¡Correo verificado!</h2>
+        <p style="color:var(--color-text-secondary);margin-bottom:var(--space-6)">
+          Tu cuenta está activa. Ya puedes iniciar sesión en tu academia.
+        </p>
+        <a href="login.html" class="btn btn-primary btn-lg">Iniciar sesión →</a>
+      </div>
+
+      <!-- Estado: Error / token inválido -->
+      <div id="view-error" style="display:none;padding:var(--space-8) 0">
+        <div style="font-size:4rem;margin-bottom:var(--space-4)">⚠️</div>
+        <h2 style="margin-bottom:var(--space-2)">Enlace inválido o expirado</h2>
+        <p style="color:var(--color-text-secondary);margin-bottom:var(--space-6)">
+          Este enlace de verificación ya no es válido. Puedes solicitar uno nuevo.
+        </p>
+
+        <div id="resend-success" class="alert alert-success" style="display:none;margin-bottom:var(--space-4);text-align:left">
+          <span class="alert-icon">✅</span>
+          <div class="alert-content">Nuevo correo enviado. Revisa tu bandeja de entrada.</div>
+        </div>
+
+        <form onsubmit="handleResend(event)" style="text-align:left">
+          <div class="form-group">
+            <label class="label" for="resend-email">Tu correo electrónico</label>
+            <div class="input-group">
+              <span class="input-group-icon">✉️</span>
+              <input type="email" id="resend-email" class="input" placeholder="tu@correo.com" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="resend-btn">Reenviar verificación</button>
+        </form>
+
+        <div style="margin-top:var(--space-4)">
+          <a href="login.html" style="font-size:var(--font-size-sm)">← Volver al inicio de sesión</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    /* Simula verificación según el token en la URL */
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      setTimeout(() => {
+        document.getElementById('view-loading').style.display = 'none';
+
+        if (!token || token === 'invalid') {
+          document.getElementById('view-error').style.display = 'block';
+        } else {
+          document.getElementById('view-success').style.display = 'block';
+        }
+      }, 1200);
+
+      /* Sin token en URL: simula éxito por defecto */
+      if (!token) {
+        setTimeout(() => {
+          document.getElementById('view-loading').style.display = 'none';
+          document.getElementById('view-success').style.display = 'block';
+        }, 1200);
+      }
+    });
+
+    function handleResend(e) {
+      e.preventDefault();
+      const btn = document.getElementById('resend-btn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        document.getElementById('resend-success').style.display = 'flex';
+        e.target.reset();
+      }, 700);
+    }
+  </script>
+</body>
+</html>

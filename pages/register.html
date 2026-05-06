@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrar Academia — AcademiaPro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body class="auth-layout">
+
+  <header class="auth-header">
+    <a href="../index.html" class="nav-logo">
+      <div class="nav-logo-icon" style="width:32px;height:32px;font-size:18px">🎭</div>
+      AcademiaPro
+    </a>
+    <span style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">
+      ¿Ya tienes cuenta? <a href="login.html">Iniciar sesión</a>
+    </span>
+  </header>
+
+  <div class="auth-body" style="padding:var(--space-8) var(--space-4)">
+    <div class="auth-card auth-card-wide" style="max-width:600px">
+
+      <!-- STEPPER -->
+      <div style="margin-bottom:var(--space-10)">
+        <div class="stepper" id="stepper">
+          <div class="step active" id="step-ind-1">
+            <div class="step-number">1</div>
+            <span class="step-label">Academia</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" id="step-ind-2">
+            <div class="step-number">2</div>
+            <span class="step-label">Cuenta Admin</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step" id="step-ind-3">
+            <div class="step-number">3</div>
+            <span class="step-label">Plan</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 1: Datos de la academia -->
+      <div class="step-content active" id="step-1">
+        <div class="auth-card-header">
+          <h1>Datos de tu academia</h1>
+          <p>Esta información aparecerá en los correos y documentos de tus alumnos.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="label label-required">Nombre de la academia</label>
+          <input type="text" class="input" id="acad-name" placeholder="ej. Academia Arte y Movimiento" value="">
+          <div class="form-error" id="err-acad-name">El nombre es requerido</div>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Tipo de academia</label>
+          <select class="input select" id="acad-type">
+            <option value="">Seleccionar tipo...</option>
+            <option>Academia de Baile</option>
+            <option>Academia de Música</option>
+            <option>Academia de Artes Marciales</option>
+            <option>Academia Deportiva</option>
+            <option>Academia de Arte</option>
+            <option>Centro Holístico / Yoga</option>
+            <option>Otro</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="margin:0">
+            <label class="label">Teléfono <span class="label-optional">(opcional)</span></label>
+            <input type="tel" class="input" placeholder="+52 55 1234 5678">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label">Correo de contacto</label>
+            <input type="email" class="input" placeholder="contacto@miacademia.com">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:var(--space-4)">
+          <label class="label">Colores de tu marca <span class="label-optional">(puedes cambiarlos después)</span></label>
+          <div style="display:flex;gap:var(--space-4);margin-top:var(--space-2)">
+            <div>
+              <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:4px">Principal</div>
+              <div class="color-swatch">
+                <input type="color" id="color-primary-reg" value="#6366f1" onchange="updateColorPreview()">
+              </div>
+            </div>
+            <div>
+              <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:4px">Secundario</div>
+              <div class="color-swatch">
+                <input type="color" id="color-secondary-reg" value="#8b5cf6" onchange="updateColorPreview()">
+              </div>
+            </div>
+            <div>
+              <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:4px">Acento</div>
+              <div class="color-swatch">
+                <input type="color" id="color-accent-reg" value="#06b6d4" onchange="updateColorPreview()">
+              </div>
+            </div>
+            <div id="color-preview" style="display:flex;align-items:center;gap:6px;margin-top:16px">
+              <div id="prev-1" style="width:20px;height:20px;border-radius:50%;background:#6366f1"></div>
+              <div id="prev-2" style="width:20px;height:20px;border-radius:50%;background:#8b5cf6"></div>
+              <div id="prev-3" style="width:20px;height:20px;border-radius:50%;background:#06b6d4"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:var(--space-6)">
+          <button class="btn btn-primary btn-lg" onclick="goStep(2)">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- PASO 2: Cuenta del administrador -->
+      <div class="step-content" id="step-2">
+        <div class="auth-card-header">
+          <h1>Tu cuenta de administrador</h1>
+          <p>Serás el administrador principal de la academia. Puedes invitar más usuarios después.</p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="margin:0">
+            <label class="label label-required">Nombre</label>
+            <input type="text" class="input" id="admin-first" placeholder="ej. Ana">
+            <div class="form-error" id="err-admin-first">Campo requerido</div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label label-required">Apellido</label>
+            <input type="text" class="input" id="admin-last" placeholder="ej. García">
+            <div class="form-error" id="err-admin-last">Campo requerido</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:var(--space-4)">
+          <label class="label label-required">Correo electrónico</label>
+          <div class="input-group">
+            <span class="input-group-icon">✉️</span>
+            <input type="email" class="input" id="admin-email" placeholder="tu@correo.com">
+          </div>
+          <div class="form-error" id="err-admin-email">Correo requerido</div>
+        </div>
+
+        <div class="form-group">
+          <label class="label label-required">Contraseña</label>
+          <div class="input-group">
+            <span class="input-group-icon">🔒</span>
+            <input type="password" class="input input-with-suffix" id="admin-pass" placeholder="Mínimo 8 caracteres">
+            <button type="button" class="input-group-suffix" onclick="togglePass('admin-pass')">👁️</button>
+          </div>
+          <div class="form-hint">Mínimo 8 caracteres. En el demo no se valida.</div>
+          <div class="form-error" id="err-admin-pass">Contraseña requerida</div>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Confirmar contraseña</label>
+          <div class="input-group">
+            <span class="input-group-icon">🔒</span>
+            <input type="password" class="input" id="admin-pass2" placeholder="Repite la contraseña">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="checkbox-item">
+            <input type="checkbox" id="terms" checked>
+            <label class="checkbox-label" for="terms">
+              Acepto los <a href="#">Términos de Uso</a> y la <a href="#">Política de Privacidad</a>
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:var(--space-4)">
+          <button class="btn btn-outline btn-lg" onclick="goStep(1)">← Anterior</button>
+          <button class="btn btn-primary btn-lg" onclick="goStep(3)">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- PASO 3: Selección de plan -->
+      <div class="step-content" id="step-3">
+        <div class="auth-card-header">
+          <h1>Elige tu plan</h1>
+          <p>Empieza gratis por 14 días. No se requiere tarjeta de crédito.</p>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+
+          <label style="cursor:pointer">
+            <input type="radio" name="plan" value="starter" style="display:none" onchange="selectPlan('starter')">
+            <div class="plan-option" id="plan-starter" style="border:2px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-4);transition:all var(--transition-fast)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="font-weight:600">Starter</div>
+                  <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Hasta 50 alumnos · 2 instructores</div>
+                </div>
+                <div style="font-size:var(--font-size-xl);font-weight:700">$299<span style="font-size:var(--font-size-xs);font-weight:400;color:var(--color-text-secondary)">/mes</span></div>
+              </div>
+            </div>
+          </label>
+
+          <label style="cursor:pointer">
+            <input type="radio" name="plan" value="profesional" style="display:none" onchange="selectPlan('profesional')" checked>
+            <div class="plan-option" id="plan-profesional" style="border:2px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--space-4);background:var(--color-primary-light);transition:all var(--transition-fast)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="display:flex;align-items:center;gap:var(--space-2)">
+                    <span style="font-weight:600">Profesional</span>
+                    <span class="badge badge-primary">Recomendado</span>
+                  </div>
+                  <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Hasta 200 alumnos · Instructores ilimitados</div>
+                </div>
+                <div style="font-size:var(--font-size-xl);font-weight:700">$799<span style="font-size:var(--font-size-xs);font-weight:400;color:var(--color-text-secondary)">/mes</span></div>
+              </div>
+            </div>
+          </label>
+
+          <label style="cursor:pointer">
+            <input type="radio" name="plan" value="enterprise" style="display:none" onchange="selectPlan('enterprise')">
+            <div class="plan-option" id="plan-enterprise" style="border:2px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-4);transition:all var(--transition-fast)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="font-weight:600">Enterprise</div>
+                  <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Alumnos ilimitados · Multi-sede</div>
+                </div>
+                <div style="font-size:var(--font-size-xl);font-weight:700">$1,499<span style="font-size:var(--font-size-xs);font-weight:400;color:var(--color-text-secondary)">/mes</span></div>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div class="alert alert-info" style="margin-top:var(--space-4)">
+          <span class="alert-icon">ℹ️</span>
+          <div class="alert-content">
+            <div>14 días de prueba gratuita. Sin tarjeta de crédito. Cancela cuando quieras.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:var(--space-6)">
+          <button class="btn btn-outline btn-lg" onclick="goStep(2)">← Anterior</button>
+          <button class="btn btn-primary btn-lg" onclick="submitRegister()">Crear mi academia 🚀</button>
+        </div>
+      </div>
+
+      <!-- ESTADO: Éxito -->
+      <div class="step-content" id="step-success">
+        <div style="text-align:center;padding:var(--space-8) 0">
+          <div style="font-size:4rem;margin-bottom:var(--space-4)">🎉</div>
+          <h2 style="margin-bottom:var(--space-2)">¡Academia creada!</h2>
+          <p style="color:var(--color-text-secondary);margin-bottom:var(--space-6)">
+            Te enviamos un correo de verificación a <strong id="success-email"></strong>.<br>
+            Confirma tu correo para activar tu cuenta.
+          </p>
+          <div class="alert alert-success" style="text-align:left;margin-bottom:var(--space-6)">
+            <span class="alert-icon">✅</span>
+            <div class="alert-content">
+              <div class="alert-title">Próximos pasos</div>
+              <div>1. Verifica tu correo electrónico<br>2. Inicia sesión y conecta Stripe<br>3. Crea tus categorías y clases<br>4. Invita a tus instructores y alumnos</div>
+            </div>
+          </div>
+          <a href="login.html" class="btn btn-primary btn-lg">Ir a iniciar sesión →</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    let currentStep = 1;
+
+    function goStep(n) {
+      if (n === 2 && !validateStep1()) return;
+      if (n === 3 && !validateStep2()) return;
+
+      document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+      document.getElementById('step-' + n).classList.add('active');
+
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('step-ind-' + i);
+        el.classList.remove('active', 'completed');
+        if (i < n) el.classList.add('completed');
+        if (i === n) el.classList.add('active');
+      }
+      currentStep = n;
+    }
+
+    function validateStep1() {
+      const name = document.getElementById('acad-name').value.trim();
+      const err = document.getElementById('err-acad-name');
+      if (!name) { err.classList.add('visible'); return false; }
+      err.classList.remove('visible');
+      return true;
+    }
+
+    function validateStep2() {
+      const firstName = document.getElementById('admin-first').value.trim();
+      const lastName  = document.getElementById('admin-last').value.trim();
+      const email     = document.getElementById('admin-email').value.trim();
+      const pass      = document.getElementById('admin-pass').value;
+      let valid = true;
+
+      [['admin-first','err-admin-first',firstName], ['admin-last','err-admin-last',lastName],
+       ['admin-email','err-admin-email',email], ['admin-pass','err-admin-pass',pass]
+      ].forEach(([fid, eid, val]) => {
+        const el = document.getElementById(eid);
+        if (!val) { el.classList.add('visible'); valid = false; }
+        else el.classList.remove('visible');
+      });
+      return valid;
+    }
+
+    function selectPlan(plan) {
+      document.querySelectorAll('.plan-option').forEach(el => {
+        el.style.borderColor = 'var(--color-border)';
+        el.style.background = '';
+      });
+      const el = document.getElementById('plan-' + plan);
+      el.style.borderColor = 'var(--color-primary)';
+      el.style.background = 'var(--color-primary-light)';
+    }
+
+    function submitRegister() {
+      const email = document.getElementById('admin-email').value.trim() || 'tu@correo.com';
+      document.getElementById('success-email').textContent = email;
+      document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+      document.getElementById('step-success').classList.add('active');
+
+      /* Marca el stepper como completado */
+      document.querySelectorAll('.step').forEach(el => {
+        el.classList.remove('active');
+        el.classList.add('completed');
+      });
+    }
+
+    function updateColorPreview() {
+      document.getElementById('prev-1').style.background = document.getElementById('color-primary-reg').value;
+      document.getElementById('prev-2').style.background = document.getElementById('color-secondary-reg').value;
+      document.getElementById('prev-3').style.background = document.getElementById('color-accent-reg').value;
+    }
+
+    function togglePass(id) {
+      const el = document.getElementById(id);
+      el.type = el.type === 'password' ? 'text' : 'password';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inicio — AcademiaPro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireAuth();
+const user = Auth.getCurrentUser();
+Utils.renderAppLayout('Inicio', 'home');
+const main = document.getElementById('app-main');
+
+/* ================================================================
+   HELPERS
+   ================================================================ */
+function getNextSession(cls) {
+  if (!cls || !cls.schedule_day) return '—';
+  const dayMap = { monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6, sunday:0 };
+  const today = new Date();
+  const target = dayMap[cls.schedule_day] ?? 1;
+  let diff = (target - today.getDay() + 7) % 7;
+  if (diff === 0) diff = 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return `${Utils.dayLabel(cls.schedule_day)} ${next.getDate()} ${next.toLocaleString('es-MX',{month:'short'})} · ${Utils.formatTime(cls.schedule_time)}`;
+}
+
+function getStudentDebtBadge(studentId) {
+  const debt = DB.getStudentDebt(studentId);
+  return debt > 0
+    ? `<span class="badge badge-danger">${Utils.formatCurrency(debt)}</span>`
+    : `<span class="badge badge-success">Al corriente</span>`;
+}
+
+/* ================================================================
+   STUDENT HOME
+   ================================================================ */
+function buildStudentHome(u) {
+  const enrollments = DB.getEnrollmentsForStudent(u.id);
+  const debt = DB.getStudentDebt(u.id);
+  const attendanceRate = DB.getAttendanceRate(u.id);
+  const categories = (u.categories || []).map(cid => DB.getCategory(cid)).filter(Boolean);
+
+  // Próxima clase
+  let nextClassLabel = 'Sin clases';
+  let nearestDiff = Infinity;
+  enrollments.forEach(e => {
+    const cls = DB.getClass(e.class_id);
+    if (!cls) return;
+    const dayMap = { monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6, sunday:0 };
+    const diff = (dayMap[cls.schedule_day] - new Date().getDay() + 7) % 7 || 7;
+    if (diff < nearestDiff) { nearestDiff = diff; nextClassLabel = `${cls.name} · ${Utils.dayLabel(cls.schedule_day)} ${Utils.formatTime(cls.schedule_time)}`; }
+  });
+
+  const enrollmentRows = enrollments.length === 0
+    ? `<div class="empty-state">
+        <div class="empty-state-icon">📚</div>
+        <h3>No tienes clases inscritas</h3>
+        <p>Explora el catálogo y encuentra la clase perfecta para ti.</p>
+        <a href="classes.html" class="btn btn-primary">Explorar clases</a>
+       </div>`
+    : enrollments.map(e => {
+        const cls = DB.getClass(e.class_id);
+        const inst = cls ? DB.getUser(cls.instructor_id) : null;
+        const pendingTxn = MOCK_DB.transactions.find(t => t.student_id === u.id && t.class_id === e.class_id && t.status === 'pending');
+        return `
+        <tr>
+          <td>
+            <div style="font-weight:600">${cls?.name || '—'}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${cls ? Utils.dayLabel(cls.schedule_day) + ' · ' + Utils.formatTime(cls.schedule_time) : '—'}</div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              ${inst ? Utils.avatarHtml(inst,'xs') : ''}
+              <span style="font-size:var(--font-size-sm)">${inst ? inst.first_name + ' ' + inst.last_name : '—'}</span>
+            </div>
+          </td>
+          <td>${(cls?.categories||[]).map(cid => Utils.categoryChip(cid)).join(' ')}</td>
+          <td>
+            ${pendingTxn
+              ? `<span class="badge badge-warning">Pendiente ${Utils.formatCurrency(pendingTxn.amount)}</span>`
+              : `<span class="badge badge-success">Al corriente</span>`}
+          </td>
+          <td>
+            <div class="actions">
+              ${pendingTxn ? `<button class="btn btn-primary btn-xs" onclick="openPaymentModal('${pendingTxn.id}','${cls?.name}',${pendingTxn.amount})">Pagar</button>` : ''}
+              <a href="classes.html" class="btn btn-ghost btn-xs">Ver</a>
+              <button class="btn btn-outline-danger btn-xs" onclick="cancelEnrollment('${e.id}','${cls?.name}')">Cancelar</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Hola, ${u.first_name} 👋</h2>
+    <p class="page-subtitle">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+  </div>
+
+  <!-- Scorecards -->
+  <div class="scorecard-grid">
+    <div class="scorecard">
+      <div class="scorecard-top">
+        <span class="scorecard-label">Clases inscritas</span>
+        <div class="scorecard-icon bg-primary-light">📚</div>
+      </div>
+      <div class="scorecard-value">${enrollments.length}</div>
+      <div class="scorecard-footer">${categories.map(c=>`<span class="chip" style="background:${c.color}22;color:${c.color}">${c.name}</span>`).join(' ') || 'Sin categoría asignada'}</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top">
+        <span class="scorecard-label">Próxima clase</span>
+        <div class="scorecard-icon" style="background:#e0f2fe;font-size:20px">📅</div>
+      </div>
+      <div class="scorecard-value" style="font-size:var(--font-size-lg);line-height:1.3">${nextClassLabel}</div>
+      <div class="scorecard-footer" style="color:var(--color-text-tertiary);font-size:var(--font-size-xs)">Siguiente sesión programada</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top">
+        <span class="scorecard-label">Deuda total</span>
+        <div class="scorecard-icon" style="background:${debt>0?'var(--color-danger-light)':'var(--color-success-light)'};font-size:20px">💳</div>
+      </div>
+      <div class="scorecard-value ${debt>0?'text-danger':'text-success'}">${Utils.formatCurrency(debt)}</div>
+      <div class="scorecard-footer">${debt>0?'Tienes pagos pendientes':'Estás al corriente 🎉'}</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top">
+        <span class="scorecard-label">Mi asistencia</span>
+        <div class="scorecard-icon" style="background:#d1fae5;font-size:20px">✅</div>
+      </div>
+      <div class="scorecard-value ${attendanceRate>=80?'text-success':attendanceRate>=60?'text-warning':'text-danger'}">${attendanceRate}%</div>
+      <div class="scorecard-footer">
+        <div class="progress-bar" style="flex:1"><div class="progress-fill ${attendanceRate>=80?'success':attendanceRate>=60?'warning':'danger'}" style="width:${attendanceRate}%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mis clases -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Mis clases inscritas</h3>
+      <a href="classes.html" class="btn btn-outline btn-sm">Explorar más clases</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th>Clase</th><th>Instructor</th><th>Categoría</th><th>Pago</th><th style="text-align:right">Acciones</th></tr></thead>
+        <tbody>${enrollmentRows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   INSTRUCTOR HOME
+   ================================================================ */
+function buildInstructorHome(u) {
+  const myClasses = DB.getInstructorClasses(u.id);
+  const totalStudents = myClasses.reduce((sum, cls) => sum + DB.getEnrollmentsForClass(cls.id).length, 0);
+  const periodStart = new Date(); periodStart.setDate(1);
+  const periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth()+1); periodEnd.setDate(0);
+  const pStart = periodStart.toISOString().split('T')[0];
+  const pEnd = periodEnd.toISOString().split('T')[0];
+  const hours = DB.getInstructorHours(u.id, pStart, pEnd);
+  const pendingPayroll = MOCK_DB.transactions.find(t => t.recipient_id === u.id && t.status === 'pending' && t.category === 'payroll');
+  const estimatedPay = Math.round(hours * (u.hourly_rate || 0));
+
+  // Today's classes
+  const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const todayDay = dayNames[new Date().getDay()];
+  const todayClasses = myClasses.filter(c => c.schedule_day === todayDay);
+
+  const classCards = myClasses.length === 0
+    ? `<div class="empty-state"><div class="empty-state-icon">🧑‍🏫</div><h3>No tienes clases asignadas</h3><p>El administrador te asignará clases próximamente.</p></div>`
+    : myClasses.map(cls => {
+        const enrolled = DB.getEnrollmentsForClass(cls.id);
+        const isToday = cls.schedule_day === todayDay;
+        return `
+        <div class="list-item" style="${isToday?'border-left:3px solid var(--color-primary);background:var(--color-primary-light);':''}">
+          <div style="font-size:1.5rem">${isToday?'🔴':'📚'}</div>
+          <div class="list-item-main">
+            <div class="list-item-title">${cls.name} ${isToday?'<span class="badge badge-primary" style="font-size:10px">HOY</span>':''}</div>
+            <div class="list-item-sub">${Utils.dayLabel(cls.schedule_day)} · ${Utils.formatTime(cls.schedule_time)} · ${cls.duration_minutes} min · ${cls.location}</div>
+          </div>
+          <div style="text-align:center;min-width:80px">
+            <div style="font-size:var(--font-size-xl);font-weight:700">${enrolled.length}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">de ${cls.max_students||'∞'}</div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary btn-sm" onclick="openAttendanceModal('${cls.id}')">Asistencia</button>
+            <a href="classes.html" class="btn btn-outline btn-sm">Roster</a>
+          </div>
+        </div>`;
+      }).join('');
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Hola, ${u.first_name} 👋</h2>
+    <p class="page-subtitle">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+  </div>
+
+  <div class="scorecard-grid">
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Clases activas</span><div class="scorecard-icon bg-primary-light">📚</div></div>
+      <div class="scorecard-value">${myClasses.length}</div>
+      <div class="scorecard-footer">${todayClasses.length > 0 ? `<span class="badge badge-primary">${todayClasses.length} hoy</span>` : 'Ninguna hoy'}</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Total alumnos</span><div class="scorecard-icon" style="background:#d1fae5;font-size:20px">👥</div></div>
+      <div class="scorecard-value">${totalStudents}</div>
+      <div class="scorecard-footer">En todas mis clases activas</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Horas este mes</span><div class="scorecard-icon" style="background:#fef3c7;font-size:20px">⏱️</div></div>
+      <div class="scorecard-value">${hours.toFixed(1)}</div>
+      <div class="scorecard-footer">Estimado: ${Utils.formatCurrency(estimatedPay)} a ${Utils.formatCurrency(u.hourly_rate||0)}/hr</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Pago del mes</span><div class="scorecard-icon" style="background:${pendingPayroll?'var(--color-warning-light)':'var(--color-success-light)'};font-size:20px">💰</div></div>
+      <div class="scorecard-value ${pendingPayroll?'text-warning':'text-success'}">${pendingPayroll?'Pendiente':'Al corriente'}</div>
+      <div class="scorecard-footer">${pendingPayroll?'El admin procesará tu pago pronto':'Último pago recibido este mes'}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Mis clases</h3>
+      <a href="classes.html" class="btn btn-primary btn-sm">Ver todas</a>
+    </div>
+    <div>${classCards}</div>
+  </div>`;
+}
+
+/* ================================================================
+   ADMIN HOME
+   ================================================================ */
+function buildAdminHome(u) {
+  const students = DB.getStudents().filter(s => s.is_active);
+  const totalDebt = DB.getTotalDebt();
+  const monthRevenue = DB.getMonthlyRevenue();
+  const allAttendance = MOCK_DB.attendance;
+  const presentCount = allAttendance.filter(a => a.status === 'present').length;
+  const avgAttendance = allAttendance.length > 0 ? Math.round(presentCount / allAttendance.length * 100) : 0;
+
+  const debtors = DB.getStudents().filter(s => DB.getStudentDebt(s.id) > 0).sort((a,b) => DB.getStudentDebt(b.id) - DB.getStudentDebt(a.id)).slice(0,5);
+  const recentTxns = MOCK_DB.transactions.filter(t => t.type === 'income' && t.status === 'succeeded').sort((a,b) => new Date(b.paid_at) - new Date(a.paid_at)).slice(0,5);
+
+  const debtorRows = debtors.length === 0
+    ? `<div style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin deudas pendientes 🎉</div>`
+    : debtors.map(s => `
+      <div class="list-item">
+        ${Utils.avatarHtml(s,'sm')}
+        <div class="list-item-main">
+          <div class="list-item-title">${s.first_name} ${s.last_name}</div>
+          <div class="list-item-sub">${s.email}</div>
+        </div>
+        <span class="badge badge-danger">${Utils.formatCurrency(DB.getStudentDebt(s.id))}</span>
+        <button class="btn btn-primary btn-xs" onclick="Utils.showEmailPreview('${s.email}','Recordatorio de pago — Academia Arte y Movimiento',\`Hola ${s.first_name},\n\nTe recordamos que tienes un pago pendiente de ${Utils.formatCurrency(DB.getStudentDebt(s.id))} en la academia.\n\nPuedes realizar tu pago directamente en la academia o a través del portal de alumnos.\n\nGracias,\nAcademia Arte y Movimiento\`)">Recordatorio</button>
+      </div>`).join('');
+
+  const recentRows = recentTxns.map(t => {
+    const student = t.student_id ? DB.getUser(t.student_id) : null;
+    return `
+    <div class="list-item">
+      <div style="font-size:1.25rem">${t.payment_method === 'stripe' ? '💳' : t.payment_method === 'cash' ? '💵' : '🏦'}</div>
+      <div class="list-item-main">
+        <div class="list-item-title">${t.subcategory}</div>
+        <div class="list-item-sub">${student ? student.first_name + ' ' + student.last_name : 'General'} · ${Utils.formatDate(t.paid_at)}</div>
+      </div>
+      <span style="font-weight:600;color:var(--color-success)">${Utils.formatCurrency(t.amount)}</span>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Bienvenida, ${u.first_name} 👋</h2>
+    <p class="page-subtitle">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+  </div>
+
+  <div class="scorecard-grid">
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Ingresos del mes</span><div class="scorecard-icon" style="background:#d1fae5;font-size:20px">💰</div></div>
+      <div class="scorecard-value text-success">${Utils.formatCurrency(monthRevenue)}</div>
+      <div class="scorecard-footer"><a href="dashboard.html" style="font-size:var(--font-size-xs)">Ver reporte completo →</a></div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Alumnos activos</span><div class="scorecard-icon bg-primary-light">👥</div></div>
+      <div class="scorecard-value">${students.length}</div>
+      <div class="scorecard-footer"><a href="students.html" style="font-size:var(--font-size-xs)">Ver todos →</a></div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Cuentas por cobrar</span><div class="scorecard-icon" style="background:${totalDebt>0?'var(--color-warning-light)':'var(--color-success-light)'};font-size:20px">📋</div></div>
+      <div class="scorecard-value ${totalDebt>0?'text-warning':'text-success'}">${Utils.formatCurrency(totalDebt)}</div>
+      <div class="scorecard-footer">${debtors.length} alumnos con deuda</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Asistencia promedio</span><div class="scorecard-icon" style="background:#dbeafe;font-size:20px">📊</div></div>
+      <div class="scorecard-value">${avgAttendance}%</div>
+      <div class="scorecard-footer">
+        <div class="progress-bar" style="flex:1"><div class="progress-fill ${avgAttendance>=80?'success':avgAttendance>=60?'warning':'danger'}" style="width:${avgAttendance}%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+    <div class="card">
+      <div class="card-header">
+        <h3>Cuentas por cobrar</h3>
+        <a href="students.html" class="btn btn-ghost btn-sm">Ver todos</a>
+      </div>
+      ${debtorRows}
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h3>Últimos pagos recibidos</h3>
+        <a href="sales.html" class="btn btn-ghost btn-sm">Ver todos</a>
+      </div>
+      ${recentRows || '<div style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin pagos recientes</div>'}
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   RECEPTIONIST HOME
+   ================================================================ */
+function buildReceptionistHome(u) {
+  const today = new Date().toISOString().split('T')[0];
+  const cobrosHoy = MOCK_DB.transactions.filter(t => t.type === 'income' && t.status === 'succeeded' && t.paid_at && t.paid_at.startsWith(today)).reduce((s,t) => s + t.amount, 0);
+  const pendingPayments = MOCK_DB.transactions.filter(t => t.type === 'income' && t.status === 'pending');
+  const studentsWithDebt = [...new Set(pendingPayments.map(t => t.student_id).filter(Boolean))].length;
+  const totalDebt = DB.getTotalDebt();
+
+  const pendingRows = pendingPayments.slice(0,8).map(t => {
+    const student = t.student_id ? DB.getUser(t.student_id) : null;
+    const cls = t.class_id ? DB.getClass(t.class_id) : null;
+    const overdue = t.due_date && new Date(t.due_date) < new Date();
+    return `
+    <div class="list-item">
+      ${student ? Utils.avatarHtml(student,'sm') : '<div class="avatar sm" style="background:var(--color-gray-100)">?</div>'}
+      <div class="list-item-main">
+        <div class="list-item-title">${student ? student.first_name + ' ' + student.last_name : '—'}</div>
+        <div class="list-item-sub">${t.subcategory}${cls ? ' · ' + cls.name : ''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:600">${Utils.formatCurrency(t.amount)}</div>
+        <div style="font-size:var(--font-size-xs);color:${overdue?'var(--color-danger)':'var(--color-text-secondary)'}">Vence ${Utils.formatDate(t.due_date)}</div>
+      </div>
+      <button class="btn btn-primary btn-xs" onclick="registerQuickPayment('${t.id}','${student?.first_name||''}',${t.amount})">Cobrar</button>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="page-header">
+    <h2 class="page-title">Buenos días, ${u.first_name} 👋</h2>
+    <p class="page-subtitle">${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+  </div>
+
+  <div class="scorecard-grid">
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Cobros hoy</span><div class="scorecard-icon" style="background:#d1fae5;font-size:20px">💵</div></div>
+      <div class="scorecard-value text-success">${Utils.formatCurrency(cobrosHoy)}</div>
+      <div class="scorecard-footer">${cobrosHoy>0?'Pagos registrados hoy':'Sin cobros registrados hoy'}</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Pendientes de cobro</span><div class="scorecard-icon" style="background:var(--color-warning-light);font-size:20px">⏳</div></div>
+      <div class="scorecard-value text-warning">${pendingPayments.length}</div>
+      <div class="scorecard-footer">Total: ${Utils.formatCurrency(totalDebt)}</div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Alumnos con deuda</span><div class="scorecard-icon" style="background:var(--color-danger-light);font-size:20px">👤</div></div>
+      <div class="scorecard-value text-danger">${studentsWithDebt}</div>
+      <div class="scorecard-footer"><a href="students.html" style="font-size:var(--font-size-xs)">Ver lista →</a></div>
+    </div>
+    <div class="scorecard">
+      <div class="scorecard-top"><span class="scorecard-label">Alumnos activos</span><div class="scorecard-icon bg-primary-light">👥</div></div>
+      <div class="scorecard-value">${DB.getStudents().filter(s=>s.is_active).length}</div>
+      <div class="scorecard-footer"><a href="students.html" style="font-size:var(--font-size-xs)">Gestionar →</a></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Pagos pendientes</h3>
+      <a href="sales.html" class="btn btn-primary btn-sm">Ver todos</a>
+    </div>
+    ${pendingRows || '<div style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin pagos pendientes 🎉</div>'}
+  </div>`;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+switch(user.role) {
+  case 'student':      main.innerHTML = buildStudentHome(user); break;
+  case 'instructor':   main.innerHTML = buildInstructorHome(user); break;
+  case 'admin':        main.innerHTML = buildAdminHome(user); break;
+  case 'receptionist': main.innerHTML = buildReceptionistHome(user); break;
+}
+Utils.initDropdowns();
+
+/* ================================================================
+   ACTIONS
+   ================================================================ */
+
+// Pago simulado (Student)
+function openPaymentModal(txnId, className, amount) {
+  let modal = document.getElementById('payment-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'payment-modal';
+    modal.className = 'modal-backdrop';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">💳 Pago seguro</h3>
+          <button class="modal-close" onclick="Utils.closeModal('payment-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info" style="margin-bottom:var(--space-4)">
+            <span class="alert-icon">ℹ️</span>
+            <div class="alert-content">Demo: el pago no se procesa realmente.</div>
+          </div>
+          <div style="text-align:center;margin-bottom:var(--space-4)">
+            <div style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">Monto a pagar</div>
+            <div id="pay-amount" style="font-size:2rem;font-weight:700;color:var(--color-primary)"></div>
+            <div id="pay-class" style="font-size:var(--font-size-sm);color:var(--color-text-secondary)"></div>
+          </div>
+          <div class="form-group">
+            <label class="label">Titular de la tarjeta</label>
+            <input type="text" class="input" value="${user.first_name} ${user.last_name}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="label">Número de tarjeta</label>
+            <input type="text" class="input" placeholder="4242 4242 4242 4242" maxlength="19" oninput="formatCard(this)">
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin:0">
+              <label class="label">Fecha de exp.</label>
+              <input type="text" class="input" placeholder="MM/AA" maxlength="5">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="label">CVC</label>
+              <input type="text" class="input" placeholder="123" maxlength="3">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="Utils.closeModal('payment-modal')">Cancelar</button>
+          <button class="btn btn-primary btn-lg" id="pay-confirm-btn" onclick="confirmPayment()">Pagar ahora 🔒</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('payment-modal'); });
+  }
+  modal._txnId = txnId;
+  document.getElementById('pay-amount').textContent = Utils.formatCurrency(amount);
+  document.getElementById('pay-class').textContent = 'Mensualidad · ' + className;
+  Utils.openModal('payment-modal');
+}
+
+function formatCard(input) {
+  input.value = input.value.replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim().substr(0,19);
+}
+
+function confirmPayment() {
+  const btn = document.getElementById('pay-confirm-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  const modal = document.getElementById('payment-modal');
+  setTimeout(() => {
+    const txn = MOCK_DB.transactions.find(t => t.id === modal._txnId);
+    if (txn) { txn.status = 'succeeded'; txn.paid_at = new Date().toISOString(); txn.payment_method = 'stripe'; }
+    Utils.closeModal('payment-modal');
+    Utils.toast('Pago exitoso', 'Tu pago fue procesado correctamente.', 'success');
+    setTimeout(() => location.reload(), 800);
+  }, 1500);
+}
+
+// Cancelar inscripción
+function cancelEnrollment(enrollmentId, className) {
+  if (!confirm(`¿Cancelar inscripción en ${className}?`)) return;
+  DB.cancelEnrollment(enrollmentId);
+  Utils.toast('Inscripción cancelada', `Se canceló la inscripción en ${className}.`, 'warning');
+  setTimeout(() => location.reload(), 800);
+}
+
+// Asistencia modal (Instructor)
+function openAttendanceModal(classId) {
+  const cls = DB.getClass(classId);
+  const enrollments = DB.getEnrollmentsForClass(classId);
+  const today = new Date().toISOString().split('T')[0];
+
+  let modal = document.getElementById('attendance-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'attendance-modal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  const existingRecords = {};
+  MOCK_DB.attendance.filter(a => a.class_id === classId && a.session_date === today)
+    .forEach(a => existingRecords[a.user_id] = a.status);
+
+  const studentRows = enrollments.map(e => {
+    const student = DB.getUser(e.student_id);
+    if (!student) return '';
+    const current = existingRecords[student.id] || 'present';
+    return `
+    <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--color-border-light)" id="att-row-${student.id}">
+      ${Utils.avatarHtml(student,'sm')}
+      <span style="flex:1;font-size:var(--font-size-sm);font-weight:500">${student.first_name} ${student.last_name}</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-xs att-btn ${current==='present'?'btn-success':'btn-outline'}" data-student="${student.id}" data-status="present" onclick="setAttStatus(this,'${student.id}')">✓ Presente</button>
+        <button class="btn btn-xs att-btn ${current==='absent'?'btn-danger':'btn-outline'}" data-student="${student.id}" data-status="absent" onclick="setAttStatus(this,'${student.id}')">✗ Ausente</button>
+        <button class="btn btn-xs att-btn ${current==='excused'?'btn-secondary':'btn-outline'}" data-student="${student.id}" data-status="excused" onclick="setAttStatus(this,'${student.id}')">~ Just.</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📋 Tomar asistencia — ${cls?.name}</h3>
+          <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${enrollments.length} alumnos inscritos</div>
+        </div>
+        <button class="modal-close" onclick="Utils.closeModal('attendance-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="label">Fecha de sesión</label>
+          <input type="date" class="input" id="att-date" value="${today}" style="max-width:200px">
+        </div>
+        <div style="margin-top:var(--space-2)">
+          ${enrollments.length === 0
+            ? '<div style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin alumnos inscritos en esta clase.</div>'
+            : studentRows}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div style="margin-right:auto;font-size:var(--font-size-xs);color:var(--color-text-secondary)" id="att-count">
+          ${Object.values(existingRecords).filter(s=>s==='present').length} presentes de ${enrollments.length}
+        </div>
+        <button class="btn btn-outline" onclick="Utils.closeModal('attendance-modal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveAttendance('${classId}')">Guardar asistencia</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('attendance-modal'); });
+  modal._attendance = { ...existingRecords };
+  enrollments.forEach(e => { if (!modal._attendance[e.student_id]) modal._attendance[e.student_id] = 'present'; });
+  Utils.openModal('attendance-modal');
+}
+
+function setAttStatus(btn, studentId) {
+  const status = btn.dataset.status;
+  const modal = document.getElementById('attendance-modal');
+  modal._attendance[studentId] = status;
+
+  const row = document.getElementById('att-row-' + studentId);
+  if (row) {
+    row.querySelectorAll('.att-btn').forEach(b => {
+      b.classList.remove('btn-success','btn-danger','btn-secondary');
+      b.classList.add('btn-outline');
+    });
+    btn.classList.remove('btn-outline');
+    if (status === 'present') btn.classList.add('btn-success');
+    else if (status === 'absent') btn.classList.add('btn-danger');
+    else btn.classList.add('btn-secondary');
+  }
+
+  const presentes = Object.values(modal._attendance).filter(s=>s==='present').length;
+  const total = Object.keys(modal._attendance).length;
+  const countEl = document.getElementById('att-count');
+  if (countEl) countEl.textContent = `${presentes} presentes de ${total}`;
+}
+
+function saveAttendance(classId) {
+  const modal = document.getElementById('attendance-modal');
+  const date = document.getElementById('att-date').value;
+  const attendance = modal._attendance;
+
+  Object.entries(attendance).forEach(([userId, status]) => {
+    const existing = MOCK_DB.attendance.find(a => a.class_id === classId && a.user_id === userId && a.session_date === date);
+    if (existing) {
+      existing.status = status;
+    } else {
+      const id = 'att_' + String(MOCK_DB.attendance.length + 1).padStart(3,'0');
+      MOCK_DB.attendance.push({ id, class_id: classId, user_id: userId, session_date: date, status, notes: null, created_at: new Date().toISOString() });
+    }
+  });
+  Utils.closeModal('attendance-modal');
+  Utils.toast('Asistencia guardada', `Registro para el ${Utils.formatDate(date)} guardado correctamente.`, 'success');
+}
+
+// Quick payment (Receptionist)
+function registerQuickPayment(txnId, studentName, amount) {
+  if (!confirm(`¿Registrar pago de ${Utils.formatCurrency(amount)} para ${studentName}?`)) return;
+  const txn = MOCK_DB.transactions.find(t => t.id === txnId);
+  if (txn) { txn.status = 'succeeded'; txn.paid_at = new Date().toISOString(); txn.payment_method = 'cash'; }
+  Utils.toast('Pago registrado', `Se registró el pago de ${studentName}.`, 'success');
+  setTimeout(() => location.reload(), 800);
+}
+</script>
+</body>
+</html>

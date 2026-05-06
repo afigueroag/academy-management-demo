@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Finanzas – Resumen</title>
+    <style>
+        div {
+            border: 1px solid black;
+        }
+        .charts-row {
+            display: flex;
+        }
+        .income-by-category-chart {
+            flex: 1 1 auto;
+        }
+        .month-income-expenses-summary {
+            width: 220px;
+        }
+        .bottom-row {
+            display: flex;
+        }
+        .recent-expenses-section {
+            flex: 1 1 auto;
+        }
+        .profit-loss-summary {
+            width: 220px;
+        }
+    </style>
+</head>
+<body>
+    <!-- (include _layout.html) -->
+    <div class="dashboard-tabs">
+        Resumen (active) | Ingresos (Navigate to dashboard-ingresos.html) | Gastos (Navigate to dashboard-gastos.html) | P&L (Navigate to dashboard-pl.html) | Nómina (Navigate to dashboard-nomina.html)
+    </div>
+    <div class="main-content">
+        <div class="scorecards-section">
+            4 tarjetas: Ingresos Totales, Gastos Totales, Utilidad Neta, Margen de Utilidad
+        </div>
+        <div class="charts-row">
+            <div class="income-by-category-chart">
+                Gráfica de barras: Ingresos por Categoría (Mensualidades, Matrículas, Equipos, Uniformes, etc.)
+            </div>
+            <div class="month-income-expenses-summary">
+                Resumen del mes en curso: total de ingresos y total de gastos comparados.
+            </div>
+        </div>
+        <div class="bottom-row">
+            <div class="recent-expenses-section">
+                <div class="recent-expenses-toolbar">
+                    CTA para registrar nuevo gasto.
+                </div>
+                <div class="recent-expenses-list">
+                    Tabla de gastos recientes: fecha, descripción, categoría, tipo, método de pago y monto.
+                    (Estado vacío) No hay gastos registrados este mes.
+                </div>
+            </div>
+            <div class="profit-loss-summary">
+                P&L del mes: Ingresos Totales, Costo de Ventas, Ganancia Bruta, Gastos Operativos, Nómina y Utilidad Neta.
+                CTA de Ver reporte completo (Navigate to dashboard-pl.html).
+            </div>
+        </div>
+        <div class="quick-actions-section">
+            Acciones rápidas: Nuevo Ingreso, Nuevo Gasto, Pago de Nómina (Navigate to dashboard-nomina.html), Ver Reportes.
+        </div>
+        <div class="upcoming-payments-section">
+            Próximos pagos pendientes: fecha, descripción, monto esperado.
+            (Estado vacío) No hay pagos pendientes próximos.
+        </div>
+    </div>
+</body>
+</html>

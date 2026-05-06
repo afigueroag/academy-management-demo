@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Categorías</title>
+    <style>
+        div {
+            border: 1px solid black;
+        }
+        .main-page {
+            display: flex;
+        }
+        .main-content {
+            flex: 1 1 auto;
+        }
+        .side-action {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <!-- (include _layout.html) -->
+    <div class="main-page">
+        <div class="main-content">
+            <div class="page-intro">
+                Solo Admin. Las categorías (cat_*) son los niveles de suscripción de la academia (Pool, Crossfit, Yoga, etc.). Controlan qué clases puede ver e inscribirse cada estudiante: una clase es accesible si el estudiante tiene al menos una de las categorías de la clase asignada en student_categories.
+            </div>
+            <div class="scorecards-section">
+                4 tarjetas: Total Categorías, Categorías con Estudiantes, Estudiantes Suscritos (total único), Ingreso Mensual Recurrente Esperado (suma de monthly_fee × estudiantes asignados por categoría).
+            </div>
+            <div class="categories-section">
+                <div class="categories-toolbar">
+                    Búsqueda por nombre. Arriba a la derecha, CTA para crear nueva categoría.
+                </div>
+                <div class="categories-list">
+                    Lista de categorías con: color (chip hex), nombre, descripción, número de clases asociadas (vía class_categories), número de estudiantes suscritos (vía student_categories), monthly_fee, enrollment_fee y CTA (editar, ver detalles, eliminar).
+                    (Estado vacío) "No hay categorías. Sin categorías los estudiantes no podrán inscribirse en clases." CTA para crear la primera categoría.
+                </div>
+            </div>
+        </div>
+        <div class="side-action">
+            No es visible inicialmente, solo cuando se selecciona un CTA específico.
+            - Crear o editar categoría: nombre, descripción, color (hex), monthly_fee, enrollment_fee.
+            - Ver detalles: lista de clases asociadas y estudiantes suscritos, ingreso recurrente generado.
+            - Confirmar eliminación: si la categoría tiene clases o estudiantes asociados, mostrar advertencia con conteo de impactos antes de confirmar.
+        </div>
+    </div>
+</body>
+</html>

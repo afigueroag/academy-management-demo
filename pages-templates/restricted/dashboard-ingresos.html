@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Finanzas – Ingresos</title>
+    <style>
+        div {
+            border: 1px solid black;
+        }
+        .charts-row {
+            display: flex;
+        }
+        .stacked-income-bar-chart {
+            flex: 1 1 auto;
+        }
+        .income-by-category-donut {
+            width: 200px;
+        }
+        .income-side-panels {
+            display: flex;
+        }
+        .income-by-group-section {
+            flex: 1;
+        }
+        .income-by-payment-method-section {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- (include _layout.html) -->
+    <div class="dashboard-tabs">
+        Resumen (Navigate to dashboard.html) | Ingresos (active) | Gastos (Navigate to dashboard-gastos.html) | P&L (Navigate to dashboard-pl.html) | Nómina (Navigate to dashboard-nomina.html)
+    </div>
+    <div class="main-content">
+        <div class="scorecards-section">
+            4 tarjetas: Ingresos Totales, Número de Transacciones, Ingreso Promedio Diario, Ingreso Acumulado del Año
+        </div>
+        <div class="charts-row">
+            <div class="stacked-income-bar-chart">
+                Barras apiladas de ingresos por mes. Cada barra muestra la composición por categoría.
+                Leyenda de categorías al lado o debajo de la gráfica.
+            </div>
+            <div class="income-by-category-donut">
+                Gráfica de dona con el porcentaje de ingresos por categoría (Mensualidades, Matrículas, Equipos, Uniformes, etc.)
+            </div>
+        </div>
+        <div class="income-list-section">
+            <div class="income-list-toolbar">
+                Filtros: por rango de fechas, por tipo de transacción, por grupo, por método de pago, por estado. Búsqueda general.
+                CTA para registrar ingreso manual.
+            </div>
+            <div class="income-list">
+                Lista detallada de transactions type=income: fecha, estudiante (student_id), clase asociada (vía enrollment_id), subcategory (mensualidad, matrícula, equipo, uniforme, etc.), descripción, payment_method, monto, status (pending/succeeded/failed/refunded).
+                (Estado vacío) No hay ingresos registrados en el período seleccionado.
+            </div>
+        </div>
+        <div class="income-side-panels">
+            <div class="income-by-group-section">
+                Ingresos agrupados por grupo/clase: nombre del grupo, total de ingresos, número de transacciones.
+            </div>
+            <div class="income-by-payment-method-section">
+                Ingresos agrupados por método de pago: efectivo, transferencia, tarjeta, Stripe, etc. Monto total y porcentaje.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración — AcademiaPro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireAuth();
+const user = Auth.getCurrentUser();
+Utils.renderAppLayout('Configuración', 'settings');
+const main = document.getElementById('app-main');
+
+/* ----------------------------------------------------------------
+   NAV ITEMS by role
+   ---------------------------------------------------------------- */
+function getNavItems(role) {
+  const base = [
+    { id:'account',   icon:'👤', label:'Mi cuenta' },
+    { id:'notifications', icon:'🔔', label:'Notificaciones' }
+  ];
+  if (role === 'admin') {
+    return [
+      ...base,
+      { id:'academy',  icon:'🏫', label:'Academia' },
+      { id:'categories', icon:'🏷️', label:'Categorías' },
+      { id:'branding', icon:'🎨', label:'Marca y colores' },
+      { id:'stripe',   icon:'💳', label:'Stripe Connect' },
+      { id:'fiscal',   icon:'📋', label:'Fiscal e impuestos' },
+      { id:'billing',  icon:'💰', label:'Plan y facturación' },
+    ];
+  }
+  return base;
+}
+
+const navItems = getNavItems(user.role);
+
+main.innerHTML = `
+<div class="page-header">
+  <h2 class="page-title">Configuración</h2>
+</div>
+
+<div style="display:grid;grid-template-columns:220px 1fr;gap:var(--space-6);align-items:start">
+
+  <!-- Settings sidebar nav -->
+  <div class="card" style="position:sticky;top:80px">
+    <div style="padding:var(--space-2)">
+      ${navItems.map((item,i) => `
+        <button class="sidebar-link settings-nav-btn" style="color:var(--color-text-secondary);width:100%;background:${i===0?'var(--color-primary-light)':''};color:${i===0?'var(--color-primary)':''}"
+          data-section="${item.id}" onclick="showSection('${item.id}')">
+          <span>${item.icon}</span>
+          <span>${item.label}</span>
+        </button>`).join('')}
+    </div>
+  </div>
+
+  <!-- Settings content -->
+  <div id="settings-content"></div>
+</div>`;
+
+/* ================================================================
+   SECTION RENDERERS
+   ================================================================ */
+
+function showSection(sectionId) {
+  // Highlight nav
+  document.querySelectorAll('.settings-nav-btn').forEach(b => {
+    b.style.background = b.dataset.section === sectionId ? 'var(--color-primary-light)' : '';
+    b.style.color = b.dataset.section === sectionId ? 'var(--color-primary)' : 'var(--color-text-secondary)';
+  });
+
+  const el = document.getElementById('settings-content');
+  switch(sectionId) {
+    case 'account':       el.innerHTML = buildAccount(); initAccount(); break;
+    case 'notifications': el.innerHTML = buildNotifications(); initNotifications(); break;
+    case 'academy':       el.innerHTML = buildAcademy(); initAcademy(); break;
+    case 'categories':    el.innerHTML = buildCategories(); break;
+    case 'branding':      el.innerHTML = buildBranding(); initBranding(); break;
+    case 'stripe':        el.innerHTML = buildStripe(); break;
+    case 'fiscal':        el.innerHTML = buildFiscal(); break;
+    case 'billing':       el.innerHTML = buildBilling(); break;
+  }
+}
+
+/* ---- MY ACCOUNT ---- */
+function buildAccount() {
+  return `
+  <div class="card">
+    <div class="card-header"><h3>Mi cuenta</h3></div>
+    <div class="card-body">
+      <!-- Avatar -->
+      <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6);padding-bottom:var(--space-6);border-bottom:1px solid var(--color-border)">
+        <div class="avatar avatar-xl ${user.role}" style="font-size:1.75rem">${Utils.getInitials(user.first_name, user.last_name)}</div>
+        <div>
+          <div style="font-weight:600;font-size:var(--font-size-lg)">${user.first_name} ${user.last_name}</div>
+          <div style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">${user.email}</div>
+          <span class="badge badge-primary" style="margin-top:var(--space-2)">${Utils.roleName(user.role)}</span>
+        </div>
+        <button class="btn btn-outline btn-sm ml-auto" onclick="Utils.toast('Foto','En el demo no se puede subir foto real.','info')">Cambiar foto</button>
+      </div>
+
+      <!-- Personal info form -->
+      <h4 style="margin-bottom:var(--space-4)">Datos personales</h4>
+      <form id="profile-form" onsubmit="saveProfile(event)">
+        <div class="form-row">
+          <div class="form-group" style="margin:0">
+            <label class="label">Nombre</label>
+            <input type="text" class="input" id="pf-first" value="${user.first_name}">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label">Apellido</label>
+            <input type="text" class="input" id="pf-last" value="${user.last_name}">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:var(--space-4)">
+          <div class="form-group" style="margin:0">
+            <label class="label">Correo electrónico</label>
+            <input type="email" class="input" id="pf-email" value="${user.email}" readonly style="background:var(--color-gray-50)">
+            <div class="form-hint">El correo no puede cambiarse desde aquí.</div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label">Teléfono</label>
+            <input type="tel" class="input" id="pf-phone" value="${user.phone||''}">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:var(--space-4)">
+          <div class="form-group" style="margin:0">
+            <label class="label">Fecha de nacimiento</label>
+            <input type="date" class="input" id="pf-dob" value="${user.date_of_birth||''}">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label">Dirección</label>
+            <input type="text" class="input" id="pf-address" value="${user.address||''}">
+          </div>
+        </div>
+        <div style="margin-top:var(--space-6);display:flex;justify-content:flex-end">
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Change password -->
+  <div class="card" style="margin-top:var(--space-4)">
+    <div class="card-header"><h3>Cambiar contraseña</h3></div>
+    <div class="card-body">
+      <form onsubmit="changePassword(event)" style="max-width:420px">
+        <div class="form-group">
+          <label class="label">Contraseña actual</label>
+          <div class="input-group">
+            <span class="input-group-icon">🔒</span>
+            <input type="password" class="input input-with-suffix" id="pass-current" placeholder="••••••••">
+            <button type="button" class="input-group-suffix" onclick="togglePF('pass-current')">👁️</button>
+          </div>
+          <div class="form-hint">En el demo, escribe cualquier cosa.</div>
+        </div>
+        <div class="form-group">
+          <label class="label">Nueva contraseña</label>
+          <div class="input-group">
+            <span class="input-group-icon">🔒</span>
+            <input type="password" class="input input-with-suffix" id="pass-new" placeholder="Mínimo 8 caracteres" minlength="8">
+            <button type="button" class="input-group-suffix" onclick="togglePF('pass-new')">👁️</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="label">Confirmar nueva contraseña</label>
+          <input type="password" class="input" id="pass-confirm" placeholder="Repite la nueva contraseña">
+          <div class="form-error" id="err-pass-confirm">Las contraseñas no coinciden</div>
+        </div>
+        <button type="submit" class="btn btn-outline-primary">Actualizar contraseña</button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function initAccount() {
+  /* already using onsubmit attrs */
+}
+
+function saveProfile(e) {
+  e.preventDefault();
+  user.first_name = document.getElementById('pf-first').value.trim() || user.first_name;
+  user.last_name  = document.getElementById('pf-last').value.trim()  || user.last_name;
+  user.phone      = document.getElementById('pf-phone').value.trim();
+  user.address    = document.getElementById('pf-address').value.trim();
+  user.date_of_birth = document.getElementById('pf-dob').value;
+  Utils.toast('Datos actualizados', 'Tu perfil fue guardado correctamente.', 'success');
+}
+
+function changePassword(e) {
+  e.preventDefault();
+  const np = document.getElementById('pass-new').value;
+  const nc = document.getElementById('pass-confirm').value;
+  const err = document.getElementById('err-pass-confirm');
+  if (np !== nc) { err.classList.add('visible'); return; }
+  err.classList.remove('visible');
+  e.target.reset();
+  Utils.toast('Contraseña actualizada', 'Tu contraseña fue cambiada correctamente.', 'success');
+}
+
+function togglePF(id) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+/* ---- NOTIFICATIONS ---- */
+function buildNotifications() {
+  const config = MOCK_DB.notifications_config[user.id] || {};
+  const options = [
+    { key:'upcoming_payments', label:'Recordatorios de pago próximo', desc:'Recibe un aviso 3 días antes de que venza un pago.' },
+    { key:'new_enrollments', label:'Confirmación de inscripción', desc:'Email al inscribirte o cancelar una clase.' },
+    { key:'attendance_reminders', label:'Recordatorios de asistencia', desc:'Aviso el día de tu clase.' },
+    { key:'waitlist_promotions', label:'Promoción de lista de espera', desc:'Aviso cuando se libere un lugar en una clase que esperas.' },
+    { key:'invoice_generated', label:'Facturas generadas', desc:'Recibe tu factura al realizarse un cobro.' }
+  ];
+
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h3>Notificaciones por correo</h3>
+      <span style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${user.email}</span>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+        ${options.map(opt => `
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--color-border);border-radius:var(--radius-lg)">
+          <div>
+            <div style="font-weight:500;font-size:var(--font-size-sm)">${opt.label}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-top:2px">${opt.desc}</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+            <input type="checkbox" ${config[opt.key]!==false?'checked':''} id="notif-${opt.key}" style="opacity:0;width:0;height:0" onchange="saveNotif()">
+            <span onclick="document.getElementById('notif-${opt.key}').click()" style="cursor:pointer;position:absolute;inset:0;background:${config[opt.key]!==false?'var(--color-primary)':'var(--color-gray-300)'};border-radius:var(--radius-full);transition:background 0.2s" id="toggle-${opt.key}">
+              <span style="position:absolute;top:3px;left:${config[opt.key]!==false?'23':'3'}px;width:18px;height:18px;background:white;border-radius:50%;transition:left 0.2s" id="toggle-knob-${opt.key}"></span>
+            </span>
+          </label>
+        </div>`).join('')}
+      </div>
+      <div style="margin-top:var(--space-4);text-align:right">
+        <button class="btn btn-primary" onclick="saveNotif(true)">Guardar preferencias</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function initNotifications() {}
+
+function saveNotif(showToast) {
+  if (!MOCK_DB.notifications_config[user.id]) MOCK_DB.notifications_config[user.id] = {};
+  const cfg = MOCK_DB.notifications_config[user.id];
+  ['upcoming_payments','new_enrollments','attendance_reminders','waitlist_promotions','invoice_generated'].forEach(key => {
+    const el = document.getElementById('notif-' + key);
+    if (!el) return;
+    cfg[key] = el.checked;
+    const toggle = document.getElementById('toggle-' + key);
+    const knob = document.getElementById('toggle-knob-' + key);
+    if (toggle) toggle.style.background = el.checked ? 'var(--color-primary)' : 'var(--color-gray-300)';
+    if (knob) knob.style.left = el.checked ? '23px' : '3px';
+  });
+  if (showToast) Utils.toast('Preferencias guardadas', 'Tus preferencias de notificación fueron actualizadas.', 'success');
+}
+
+/* ---- ACADEMY (Admin) ---- */
+function buildAcademy() {
+  const a = MOCK_DB.academy;
+  return `
+  <div class="card">
+    <div class="card-header"><h3>Datos de la academia</h3></div>
+    <div class="card-body">
+      <form onsubmit="saveAcademy(event)">
+        <div class="form-group">
+          <label class="label">Nombre de la academia</label>
+          <input type="text" class="input" id="ac-name" value="${a.name}">
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="margin:0">
+            <label class="label">Correo de contacto</label>
+            <input type="email" class="input" id="ac-email" value="${a.email}">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label">Teléfono</label>
+            <input type="tel" class="input" id="ac-phone" value="${a.phone||''}">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:var(--space-4)">
+          <label class="label">Dirección</label>
+          <input type="text" class="input" id="ac-address" value="${a.address||''}">
+        </div>
+        <div style="margin-top:var(--space-6);display:flex;justify-content:flex-end">
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+function initAcademy() {}
+function saveAcademy(e) {
+  e.preventDefault();
+  MOCK_DB.academy.name  = document.getElementById('ac-name').value  || MOCK_DB.academy.name;
+  MOCK_DB.academy.email = document.getElementById('ac-email').value || MOCK_DB.academy.email;
+  MOCK_DB.academy.phone = document.getElementById('ac-phone').value;
+  MOCK_DB.academy.address = document.getElementById('ac-address').value;
+  Utils.toast('Academia actualizada', 'Los datos fueron guardados.', 'success');
+}
+
+/* ---- CATEGORIES (Admin) ---- */
+function buildCategories() {
+  const cats = MOCK_DB.categories;
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h3>Categorías de suscripción</h3>
+      <a href="categories.html" class="btn btn-primary btn-sm">Gestionar categorías →</a>
+    </div>
+    <div class="card-body">
+      <div class="alert alert-primary" style="margin-bottom:var(--space-4)">
+        <span class="alert-icon">ℹ️</span>
+        <div>Las categorías definen los planes de acceso de tus alumnos. Crea y edita categorías desde la página dedicada.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-3)">
+        ${cats.map(c => `
+        <div style="border:2px solid ${c.color};border-radius:var(--radius-lg);padding:var(--space-4)">
+          <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+            <div style="width:12px;height:12px;border-radius:50%;background:${c.color}"></div>
+            <span style="font-weight:600">${c.name}</span>
+          </div>
+          <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:var(--space-2)">${c.description}</div>
+          <div style="font-size:var(--font-size-sm);font-weight:600">${Utils.formatCurrency(c.monthly_fee)}/mes</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---- BRANDING (Admin) — color picker en tiempo real ---- */
+function buildBranding() {
+  const saved = JSON.parse(localStorage.getItem('academy_theme') || '{}');
+  const p = saved.colorPrimary || MOCK_DB.academy.theme.colorPrimary || '#6366f1';
+  const s = saved.colorSecondary || MOCK_DB.academy.theme.colorSecondary || '#8b5cf6';
+  const ac = saved.colorAccent || MOCK_DB.academy.theme.colorAccent || '#06b6d4';
+
+  return `
+  <div class="card">
+    <div class="card-header"><h3>Marca y colores</h3></div>
+    <div class="card-body">
+      <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin-bottom:var(--space-6)">
+        Los tres colores se aplican en toda la aplicación: sidebar, botones, gráficas y acentos. Los cambios se ven en tiempo real.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-6);margin-bottom:var(--space-6)">
+        ${[
+          { id:'color-primary',   label:'Color Principal',   desc:'Sidebar y botones primarios',   val: p },
+          { id:'color-secondary', label:'Color Secundario',  desc:'Botones y badges secundarios',   val: s },
+          { id:'color-accent',    label:'Color de Acento',   desc:'Gráficas, enlaces y destacados', val: ac }
+        ].map(c => `
+        <div style="text-align:center">
+          <div style="width:80px;height:80px;border-radius:50%;background:${c.val};margin:0 auto var(--space-3);box-shadow:var(--shadow-md);cursor:pointer;overflow:hidden;border:3px solid white;box-shadow:0 0 0 2px ${c.val}40" onclick="document.getElementById('${c.id}-input').click()">
+            <input type="color" id="${c.id}-input" value="${c.val}" style="opacity:0;width:100%;height:100%;cursor:pointer" oninput="previewColor(this,'${c.id}')">
+          </div>
+          <div style="font-weight:600;font-size:var(--font-size-sm)">${c.label}</div>
+          <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:4px 0">${c.desc}</div>
+          <div id="${c.id}-hex" style="font-size:var(--font-size-xs);font-family:monospace;color:var(--color-text-tertiary)">${c.val}</div>
+        </div>`).join('')}
+      </div>
+
+      <!-- Preview bar -->
+      <div style="border-radius:var(--radius-lg);overflow:hidden;margin-bottom:var(--space-6);box-shadow:var(--shadow-md)">
+        <div id="preview-sidebar" style="background:${Utils._darken(p,25)};padding:var(--space-4);display:flex;align-items:center;gap:var(--space-3)">
+          <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:var(--radius);display:flex;align-items:center;justify-content:center">🎭</div>
+          <div style="color:white;font-weight:600">Vista previa del sidebar</div>
+        </div>
+        <div style="background:white;padding:var(--space-4);display:flex;gap:var(--space-3);align-items:center">
+          <button id="preview-btn-primary" class="btn" style="background:${p};border-color:${p};color:white">Botón principal</button>
+          <button id="preview-btn-secondary" class="btn" style="background:${s};border-color:${s};color:white">Secundario</button>
+          <span id="preview-badge" style="background:${ac}22;color:${ac};padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600">Acento</span>
+        </div>
+      </div>
+
+      <div class="alert alert-info" style="margin-bottom:var(--space-4)">
+        <span class="alert-icon">💡</span>
+        <div>Los colores se guardan en tu navegador y se aplican en todas las páginas del demo.</div>
+      </div>
+
+      <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+        <button class="btn btn-outline" onclick="resetColors()">Restablecer defaults</button>
+        <button class="btn btn-primary" onclick="applyAndSaveColors()">Aplicar y guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logo upload -->
+  <div class="card" style="margin-top:var(--space-4)">
+    <div class="card-header"><h3>Logotipo</h3></div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:var(--space-6)">
+        <div style="width:80px;height:80px;background:var(--color-primary);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:2.5rem">🎭</div>
+        <div>
+          <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin-bottom:var(--space-3)">El logotipo aparece en el sidebar y en los correos.</p>
+          <button class="btn btn-outline btn-sm" onclick="Utils.toast('Logo','En el demo no se puede subir un logo real.','info')">Subir nuevo logo</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function initBranding() { /* inputs are inline */ }
+
+function previewColor(input, colorId) {
+  const val = input.value;
+  document.getElementById(colorId + '-hex').textContent = val;
+  input.closest('div').style.background = val;
+  input.closest('div').style.boxShadow = `0 0 0 2px ${val}40`;
+
+  if (colorId === 'color-primary') {
+    document.getElementById('preview-sidebar').style.background = Utils._darken(val, 25);
+    document.getElementById('preview-btn-primary').style.background = val;
+    document.getElementById('preview-btn-primary').style.borderColor = val;
+  } else if (colorId === 'color-secondary') {
+    document.getElementById('preview-btn-secondary').style.background = val;
+    document.getElementById('preview-btn-secondary').style.borderColor = val;
+  } else if (colorId === 'color-accent') {
+    const badge = document.getElementById('preview-badge');
+    badge.style.background = val + '22';
+    badge.style.color = val;
+  }
+}
+
+function applyAndSaveColors() {
+  const p  = document.getElementById('color-primary-input').value;
+  const s  = document.getElementById('color-secondary-input').value;
+  const ac = document.getElementById('color-accent-input').value;
+  Utils.saveTheme(p, s, ac);
+  Utils.toast('Colores aplicados', 'El tema de la academia fue actualizado en toda la app.', 'success');
+}
+
+function resetColors() {
+  localStorage.removeItem('academy_theme');
+  const root = document.documentElement;
+  root.style.setProperty('--color-primary', '#6366f1');
+  root.style.setProperty('--color-secondary', '#8b5cf6');
+  root.style.setProperty('--color-accent', '#06b6d4');
+  root.style.setProperty('--color-primary-dark', '#4f46e5');
+  root.style.setProperty('--color-primary-darker', '#3730a3');
+  root.style.setProperty('--color-primary-light', '#e0e7ff');
+  root.style.setProperty('--color-sidebar-bg', '#312e81');
+  Utils.toast('Colores restablecidos', 'Se restauraron los colores por defecto.', 'info');
+  showSection('branding');
+}
+
+/* ---- STRIPE (Admin) ---- */
+function buildStripe() {
+  const connected = MOCK_DB.academy.stripe_connected;
+  return `
+  <div class="card">
+    <div class="card-header"><h3>Stripe Connect</h3></div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6)">
+        <div style="font-size:3rem">💳</div>
+        <div>
+          <div style="font-weight:600">Estado de conexión</div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-1)">
+            <span class="status-dot ${connected?'active':'inactive'}"></span>
+            <span style="font-size:var(--font-size-sm)">${connected?'Conectado':'No conectado'}</span>
+          </div>
+        </div>
+      </div>
+      ${connected
+        ? `<div class="alert alert-success" style="margin-bottom:var(--space-4)"><span class="alert-icon">✅</span><div>Tu cuenta de Stripe está conectada. Los alumnos pueden pagar con tarjeta.</div></div>
+           <button class="btn btn-outline-danger btn-sm" onclick="toggleStripe()">Desconectar Stripe</button>`
+        : `<div class="alert alert-warning" style="margin-bottom:var(--space-4)"><span class="alert-icon">⚠️</span><div>Sin Stripe Connect, los alumnos no pueden pagar con tarjeta de crédito. Solo podrás registrar pagos en efectivo o transferencia.</div></div>
+           <button class="btn btn-primary" onclick="toggleStripe()">Conectar con Stripe →</button>`}
+    </div>
+  </div>`;
+}
+function toggleStripe() {
+  MOCK_DB.academy.stripe_connected = !MOCK_DB.academy.stripe_connected;
+  Utils.toast(MOCK_DB.academy.stripe_connected ? 'Stripe conectado' : 'Stripe desconectado', 'Demo: simulación de conexión.', MOCK_DB.academy.stripe_connected?'success':'warning');
+  showSection('stripe');
+}
+
+/* ---- FISCAL (Admin) ---- */
+function buildFiscal() {
+  return `
+  <div class="card">
+    <div class="card-header"><h3>Datos fiscales e impuestos</h3></div>
+    <div class="card-body">
+      <form onsubmit="saveFiscal(event)">
+        <div class="form-row">
+          <div class="form-group" style="margin:0">
+            <label class="label">RFC / NIT</label>
+            <input type="text" class="input" id="fc-rfc" value="${MOCK_DB.academy.rfc||''}">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="label">Tasa de impuesto (IVA %)</label>
+            <input type="number" class="input" id="fc-tax" value="${MOCK_DB.academy.tax_rate||16}" min="0" max="100">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:var(--space-4)">
+          <label class="label">Mes de inicio del año fiscal</label>
+          <select class="input select" id="fc-year">
+            ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+              .map((m,i) => `<option value="${i+1}" ${MOCK_DB.academy.fiscal_year_start===(i+1)?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div style="margin-top:var(--space-6);display:flex;justify-content:flex-end">
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+function saveFiscal(e) {
+  e.preventDefault();
+  MOCK_DB.academy.rfc = document.getElementById('fc-rfc').value;
+  MOCK_DB.academy.tax_rate = parseFloat(document.getElementById('fc-tax').value)||16;
+  MOCK_DB.academy.fiscal_year_start = parseInt(document.getElementById('fc-year').value)||1;
+  Utils.toast('Datos fiscales guardados', '', 'success');
+}
+
+/* ---- BILLING (Admin) ---- */
+function buildBilling() {
+  const planLabels = { starter:'Starter', profesional:'Profesional', enterprise:'Enterprise' };
+  const planPrices = { starter:299, profesional:799, enterprise:1499 };
+  const plan = MOCK_DB.academy.plan || 'profesional';
+  return `
+  <div class="card">
+    <div class="card-header"><h3>Plan y facturación</h3></div>
+    <div class="card-body">
+      <div style="background:var(--color-primary-light);border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-6)">
+        <div style="font-size:var(--font-size-xs);color:var(--color-primary-dark);text-transform:uppercase;letter-spacing:0.06em;font-weight:600">Plan actual</div>
+        <div style="font-size:var(--font-size-3xl);font-weight:700;margin:var(--space-2) 0">${planLabels[plan]} <span style="font-size:var(--font-size-lg);color:var(--color-text-secondary)">— ${Utils.formatCurrency(planPrices[plan])}/mes</span></div>
+        <div style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">Próximo cobro: 1 de junio 2026 · Expira: ${Utils.formatDate(MOCK_DB.academy.plan_expires)}</div>
+      </div>
+      <div style="display:flex;gap:var(--space-3)">
+        <button class="btn btn-outline btn-sm" onclick="Utils.toast('Cambio de plan','Funcionalidad disponible en la versión completa.','info')">Cambiar plan</button>
+        <button class="btn btn-outline-danger btn-sm" onclick="Utils.toast('Cancelación','Funcionalidad disponible en la versión completa.','warning')">Cancelar suscripción</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   INIT — show first section
+   ================================================================ */
+showSection('account');
+</script>
+</body>
+</html>

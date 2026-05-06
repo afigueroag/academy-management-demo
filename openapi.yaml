@@ -1,0 +1,4122 @@
+# This is an **example** API to demonstrate features of OpenAPI specification.
+# It doesn't cover all OpenAPI features. For more full example check out: https://github.com/APIs-guru/petstore_extended
+
+openapi: 3.0.2
+info:
+  version: '1.0.0'
+  title: Academy Management API
+  description: |
+    SaaS API for academy management (sports, music, arts, etc.)
+
+    # Features
+    - Multi-tenant: Each academy is isolated
+    - 4 roles: Admin, Receptionist, Instructor, Student
+    - OAuth2 Authorization Code flow
+    - Stripe Connect for payments
+    - Automated invoicing & audit logs
+
+    # Authentication
+    All endpoints (except `/auth/*` signup/login) require OAuth2 Bearer token in Authorization header:
+    ```
+    Authorization: Bearer {access_token}
+    ```
+
+  contact:
+    email: support@academy-management.com
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+externalDocs:
+  description: Find out how to create a GitHub repo for your OpenAPI definition.
+  url: 'https://github.com/Rebilly/generator-openapi-repo'
+
+tags:
+  - name: Authentication
+    description: Signup, login, token refresh, password reset
+  - name: Users
+    description: User management (filter by role for instructors, students, etc.)
+  - name: Academies
+    description: Academy/account settings
+  - name: Categories
+    description: Class categories/subscriptions (admin only)
+  - name: Classes
+    description: Classes management
+  - name: Enrollments
+    description: Class enrollments/inscriptions
+  - name: Payments
+    description: Payment processing with Stripe
+  - name: Invoices
+    description: Invoice generation and management
+  - name: Attendance
+    description: Attendance tracking
+  - name: Dashboard
+    description: Admin reports and analytics
+
+servers:
+  - url: 'http://localhost:3000/api/v1'
+  - url: 'https://api.academy-management.com/api/v1'
+
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Admin signup (create academy account)
+      description: Create new academy account with subscription. Admin receives verification email.
+      operationId: adminSignup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, academy_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@myacademy.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+                academy_name:
+                  type: string
+                  example: My Sports Academy
+                first_name:
+                  type: string
+                  example: John
+                last_name:
+                  type: string
+                  example: Doe
+      responses:
+        '201':
+          description: Account created. Verification email sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Account created. Please verify your email.
+                  academy_id:
+                    type: string
+                    example: acad_123abc
+                  email:
+                    type: string
+                    example: admin@myacademy.com
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email address
+      description: Verify email with token sent to admin's email. Must be done before login.
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified. You can now login.
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      description: Returns access token (30 min) and refresh token (30 days)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@myacademy.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Invalid credentials or email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: Get new access token using refresh token
+      description: Exchange refresh token for new access token (30 min). Refresh token remains valid.
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    example: 1800
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout (invalidate refresh token)
+      description: Invalidate current refresh token. User must login again.
+      operationId: logout
+      security:
+        - oauth2: [read:profile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+
+  /auth/invite:
+    post:
+      tags:
+        - Authentication
+      summary: Invite user to academy
+      description: Send invitation email to receptionist, instructor, or student with unique signup link
+      operationId: inviteUser
+      security:
+        - oauth2: [write:users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: instructor@example.com
+                role:
+                  type: string
+                  enum: [receptionist, instructor, student]
+                  example: instructor
+                first_name:
+                  type: string
+                  example: Jane
+                last_name:
+                  type: string
+                  example: Smith
+      responses:
+        '200':
+          description: Invitation sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invitation sent to instructor@example.com
+                  invitation_id:
+                    type: string
+                    example: inv_456def
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /auth/signup-invited:
+    post:
+      tags:
+        - Authentication
+      summary: Complete signup as invited user
+      description: Invited user completes registration with unique invitation token
+      operationId: signupInvited
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitation_token, password]
+              properties:
+                invitation_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+      responses:
+        '201':
+          description: Signup complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          description: Invalid or expired invitation token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: Send password reset email with unique reset link
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@academy.com
+      responses:
+        '200':
+          description: Password reset email sent (always returns 200 for security)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: If email exists, password reset link sent
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password with token
+      description: Reset password using token from reset email
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: NewSecurePass456!
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password updated. Please login with new password.
+        '400':
+          description: Invalid or expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List all users in academy
+      description: Get list of all users (admin/receptionist). Results filtered by role permissions.
+      operationId: listUsers
+      security:
+        - oauth2: [read:users]
+      parameters:
+        - name: role
+          in: query
+          description: Filter by role (admin, receptionist, instructor, student)
+          schema:
+            type: string
+            enum: [admin, receptionist, instructor, student]
+        - name: is_active
+          in: query
+          description: Filter by active state
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          description: Search by name or email
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+                    example: 45
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Users
+      summary: Create new user
+      description: Create user record (any role). Admin/receptionist only. Sends invitation email.
+      operationId: createUser
+      security:
+        - oauth2: [write:users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, first_name, last_name, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: student@example.com
+                first_name:
+                  type: string
+                  example: Carlos
+                last_name:
+                  type: string
+                  example: Garcia
+                role:
+                  type: string
+                  enum: [admin, receptionist, instructor, student]
+                  example: student
+                phone:
+                  type: string
+                  example: '+52-55-9876-5432'
+                address:
+                  type: string
+                  example: Calle Secundaria 456, Ciudad de México
+                date_of_birth:
+                  type: string
+                  format: date
+                  example: '2010-05-15'
+                hourly_rate:
+                  type: number
+                  format: float
+                  description: Instructor-only. Hourly rate for payroll calculations.
+                  example: 250.00
+      responses:
+        '201':
+          description: User created. Invitation email sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieve user details. Students can only see their own profile.
+      operationId: getUser
+      security:
+        - oauth2: [read:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_123abc
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Users
+      summary: Update user
+      description: Update user information. Students can only update their own profile. Only admin can change roles.
+      operationId: updateUser
+      security:
+        - oauth2: [write:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_123abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  example: John
+                last_name:
+                  type: string
+                  example: Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                phone:
+                  type: string
+                  example: '+52-55-1234-5678'
+                address:
+                  type: string
+                  example: Calle Principal 123, Ciudad de México
+                date_of_birth:
+                  type: string
+                  format: date
+                  example: '1990-05-15'
+                hourly_rate:
+                  type: number
+                  format: float
+                  description: Instructor-only. Updates hourly_rate in current academy context.
+                  example: 250.00
+                is_active:
+                  type: boolean
+                  description: Only admin can deactivate users
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Users
+      summary: Deactivate user (soft delete)
+      description: Deactivate user account (sets is_active to false). Only admin can delete users.
+      operationId: deleteUser
+      security:
+        - oauth2: [write:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_123abc
+      responses:
+        '200':
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User deactivated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/resend-invite:
+    post:
+      tags:
+        - Users
+      summary: Resend invitation email
+      description: Resend invitation email to user (useful if original email was lost)
+      operationId: resendInvite
+      security:
+        - oauth2: [write:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_123abc
+      responses:
+        '200':
+          description: Invitation resent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invitation email resent
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/password:
+    patch:
+      tags:
+        - Users
+      summary: Change user password
+      description: Change password. Users can only change their own password. Requires current password verification.
+      operationId: changePassword
+      security:
+        - oauth2: [write:profile]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_123abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                  example: OldPassword123!
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: NewPassword456!
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password updated successfully
+        '400':
+          description: Invalid current password or password requirements not met
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Users can only change their own password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: List all categories
+      description: Get list of all class categories in academy (admin only). Used for filtering classes and assigning to students.
+      operationId: listCategories
+      security:
+        - oauth2: [read:classes]
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+                  total:
+                    type: integer
+                    example: 5
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Categories
+      summary: Create new category
+      description: Create new class category (e.g., pool, crossfit, hyrox). Admin only.
+      operationId: createCategory
+      security:
+        - oauth2: [write:classes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: Pool
+                description:
+                  type: string
+                  example: Swimming pool classes and programs
+                color:
+                  type: string
+                  description: Hex color for UI display
+                  example: '#0066CC'
+                monthly_fee:
+                  type: number
+                  format: float
+                  description: Monthly subscription fee for students with this category
+                  example: 1200.00
+                enrollment_fee:
+                  type: number
+                  format: float
+                  description: One-time enrollment fee charged when assigning category to a student
+                  example: 500.00
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Category name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Get category details
+      operationId: getCategory
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Category ID
+          schema:
+            type: string
+            example: cat_123abc
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Categories
+      summary: Update category
+      operationId: updateCategory
+      security:
+        - oauth2: [write:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Category ID
+          schema:
+            type: string
+            example: cat_123abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Pool
+                description:
+                  type: string
+                  example: Swimming pool classes
+                color:
+                  type: string
+                  example: '#0066CC'
+                monthly_fee:
+                  type: number
+                  format: float
+                  example: 1200.00
+                enrollment_fee:
+                  type: number
+                  format: float
+                  example: 500.00
+      responses:
+        '200':
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Categories
+      summary: Delete category
+      operationId: deleteCategory
+      security:
+        - oauth2: [write:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Category ID
+          schema:
+            type: string
+            example: cat_123abc
+      responses:
+        '200':
+          description: Category deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Category deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /classes:
+    get:
+      tags:
+        - Classes
+      summary: List classes
+      description: Get list of classes. Admins see all, instructors see assigned, students see available for enrollment.
+      operationId: listClasses
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: instructor_id
+          in: query
+          description: Filter by instructor (admin only)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by status (active, archived)
+          schema:
+            type: string
+            enum: [active, archived, draft]
+        - name: category_id
+          in: query
+          description: Filter by category ID (automatically applied for students based on their assigned categories)
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search by class name or description
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of classes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  classes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Class'
+                  total:
+                    type: integer
+                    example: 12
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Classes
+      summary: Create new class
+      description: Create a new class. Only admin can create classes.
+      operationId: createClass
+      security:
+        - oauth2: [write:classes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, instructor_id, schedule_day, schedule_time, category_ids]
+              properties:
+                name:
+                  type: string
+                  example: Yoga - Monday Morning
+                description:
+                  type: string
+                  example: Beginner yoga class for adults
+                instructor_id:
+                  type: string
+                  example: user_123abc
+                schedule_day:
+                  type: string
+                  enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+                  example: monday
+                schedule_time:
+                  type: string
+                  format: time
+                  example: '09:00'
+                duration_minutes:
+                  type: integer
+                  example: 60
+                recurrence:
+                  type: string
+                  enum: [weekly, one_time]
+                  description: Whether class repeats weekly or is one-time only
+                  example: weekly
+                category_ids:
+                  type: array
+                  description: Categories this class belongs to (e.g., [cat_pool, cat_crossfit]). Controls which students can see/enroll in this class.
+                  items:
+                    type: string
+                  example: [cat_pool, cat_wellness]
+                max_students:
+                  type: integer
+                  description: Optional capacity limit. If null, unlimited enrollment.
+                  example: 20
+                price:
+                  type: number
+                  format: float
+                  description: Class price per enrollment
+                  example: 150.00
+                location:
+                  type: string
+                  example: Studio A, Building 1
+      responses:
+        '201':
+          description: Class created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Class'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /classes/{id}:
+    get:
+      tags:
+        - Classes
+      summary: Get class details
+      description: Get class details including enrolled students (instructors see their class students)
+      operationId: getClass
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Class ID
+          schema:
+            type: string
+            example: class_123abc
+      responses:
+        '200':
+          description: Class details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class:
+                    $ref: '#/components/schemas/Class'
+                  students:
+                    type: array
+                    description: Enrolled students (only visible to instructor of this class or admin)
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total_students:
+                    type: integer
+                    example: 15
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Classes
+      summary: Update class
+      description: Update class information. Only admin can update classes.
+      operationId: updateClass
+      security:
+        - oauth2: [write:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Class ID
+          schema:
+            type: string
+            example: class_123abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Yoga - Monday Morning
+                description:
+                  type: string
+                  example: Beginner yoga class
+                instructor_id:
+                  type: string
+                  example: user_456def
+                schedule_day:
+                  type: string
+                  enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+                schedule_time:
+                  type: string
+                  format: time
+                duration_minutes:
+                  type: integer
+                recurrence:
+                  type: string
+                  enum: [weekly, one_time]
+                category_ids:
+                  type: array
+                  items:
+                    type: string
+                  example: [cat_pool, cat_wellness]
+                max_students:
+                  type: integer
+                price:
+                  type: number
+                  format: float
+                location:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, archived, draft]
+      responses:
+        '200':
+          description: Class updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Class'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Classes
+      summary: Archive class
+      description: Archive class (soft delete). Only admin can delete classes.
+      operationId: deleteClass
+      security:
+        - oauth2: [write:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Class ID
+          schema:
+            type: string
+            example: class_123abc
+      responses:
+        '200':
+          description: Class archived
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Class archived
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /classes/{id}/attendance:
+    get:
+      tags:
+        - Attendance
+      summary: Get class attendance records
+      description: Get attendance records for a specific class on a specific date. Only instructors of this class and admin can view.
+      operationId: getClassAttendance
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Class ID
+          schema:
+            type: string
+            example: class_123abc
+        - name: date
+          in: query
+          required: true
+          description: Date in YYYY-MM-DD format
+          schema:
+            type: string
+            format: date
+            example: '2026-04-29'
+      responses:
+        '200':
+          description: Attendance records for the class
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class_id:
+                    type: string
+                    example: class_123abc
+                  date:
+                    type: string
+                    format: date
+                    example: '2026-04-29'
+                  attendance:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AttendanceRecord'
+                  summary:
+                    type: object
+                    properties:
+                      total_students:
+                        type: integer
+                        example: 20
+                      present:
+                        type: integer
+                        example: 18
+                      absent:
+                        type: integer
+                        example: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /classes/{id}/waiting-list:
+    get:
+      tags:
+        - Classes
+      summary: Get class waiting list
+      description: Get list of students waiting to enroll in this class (when class is at capacity). Only instructor of class and admin can view.
+      operationId: getClassWaitingList
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Class ID
+          schema:
+            type: string
+            example: class_123abc
+      responses:
+        '200':
+          description: Waiting list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class_id:
+                    type: string
+                    example: class_123abc
+                  class_name:
+                    type: string
+                    example: Yoga - Monday Morning
+                  waiting_list:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        enrollment_id:
+                          type: string
+                          example: enroll_999xyz
+                        student_id:
+                          type: string
+                          example: user_456def
+                        student_name:
+                          type: string
+                          example: Carlos Garcia
+                        email:
+                          type: string
+                          example: carlos@example.com
+                        phone:
+                          type: string
+                          example: '+52-55-9876-5432'
+                        joined_waiting_list_at:
+                          type: string
+                          format: date-time
+                          example: '2026-04-29T14:30:00Z'
+                        position:
+                          type: integer
+                          description: Position in waiting list (1 = first in line)
+                          example: 1
+                  total_waiting:
+                    type: integer
+                    example: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/enrollments:
+    get:
+      tags:
+        - Enrollments
+      summary: Get user enrollments
+      description: Get all class enrollments for a user. Users can only see their own enrollments.
+      operationId: getUserEnrollments
+      security:
+        - oauth2: [read:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_456def
+        - name: status
+          in: query
+          description: Filter by enrollment status
+          schema:
+            type: string
+            enum: [active, completed, cancelled, waiting]
+      responses:
+        '200':
+          description: User enrollments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    example: user_456def
+                  enrollments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Enrollment'
+                  total:
+                    type: integer
+                    example: 5
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/categories:
+    get:
+      tags:
+        - Users
+      summary: Get user categories
+      description: Get categories assigned to a user (subscription level for students). Controls which classes they can see and enroll in.
+      operationId: getUserCategories
+      security:
+        - oauth2: [read:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_456def
+      responses:
+        '200':
+          description: User categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    example: user_456def
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+                  total:
+                    type: integer
+                    example: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Users
+      summary: Assign categories to user
+      description: Assign categories (subscription types) to a user (typically a student). Admin/receptionist only. Replaces all existing categories.
+      operationId: assignUserCategories
+      security:
+        - oauth2: [write:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            example: user_456def
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category_ids]
+              properties:
+                category_ids:
+                  type: array
+                  description: List of category IDs to assign
+                  items:
+                    type: string
+                  example: [cat_pool, cat_crossfit]
+      responses:
+        '200':
+          description: Categories assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    example: user_456def
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /enrollments:
+    get:
+      tags:
+        - Enrollments
+      summary: List enrollments
+      description: Get list of enrollments. Admins/receptionists see all, instructors see their class enrollments, students see their own.
+      operationId: listEnrollments
+      security:
+        - oauth2: [read:users]
+      parameters:
+        - name: student_id
+          in: query
+          description: Filter by student (admin only)
+          schema:
+            type: string
+        - name: class_id
+          in: query
+          description: Filter by class (instructors see their classes, admin sees all)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by enrollment status
+          schema:
+            type: string
+            enum: [active, completed, cancelled, waiting]
+        - name: limit
+          in: query
+          description: Number of results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of enrollments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrollments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Enrollment'
+                  total:
+                    type: integer
+                    example: 150
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Enrollments
+      summary: Enroll student in class
+      description: Student enrolls in a class. If class is at capacity, student goes to waiting list. Requires student to have the class's assigned categories.
+      operationId: createEnrollment
+      security:
+        - oauth2: [write:users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, class_id]
+              properties:
+                student_id:
+                  type: string
+                  example: user_456def
+                class_id:
+                  type: string
+                  example: class_123abc
+      responses:
+        '201':
+          description: Enrollment created (active or waiting list)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrollment:
+                    $ref: '#/components/schemas/Enrollment'
+                  message:
+                    type: string
+                    example: "Student enrolled successfully (active enrollment)"
+                  waiting_position:
+                    type: integer
+                    nullable: true
+                    description: Position in waiting list (null if active enrollment)
+                    example: null
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                no_category:
+                  value:
+                    error: forbidden_enrollment
+                    message: Student does not have required category for this class
+                already_enrolled:
+                  value:
+                    error: conflict
+                    message: Student is already enrolled in this class
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /enrollments/{id}:
+    get:
+      tags:
+        - Enrollments
+      summary: Get enrollment details
+      description: Get specific enrollment details with payment and class info
+      operationId: getEnrollment
+      security:
+        - oauth2: [read:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Enrollment ID
+          schema:
+            type: string
+            example: enroll_789ghi
+      responses:
+        '200':
+          description: Enrollment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enrollment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Enrollments
+      summary: Update enrollment
+      description: Update enrollment status (admin/receptionist only). Can approve, cancel, or mark as completed.
+      operationId: updateEnrollment
+      security:
+        - oauth2: [write:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Enrollment ID
+          schema:
+            type: string
+            example: enroll_789ghi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, completed, cancelled, waiting]
+                  description: New enrollment status. Admin only.
+                  example: active
+                notes:
+                  type: string
+                  example: Received payment via cash
+      responses:
+        '200':
+          description: Enrollment updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrollment:
+                    $ref: '#/components/schemas/Enrollment'
+                  promoted_student:
+                    type: object
+                    nullable: true
+                    description: If a waiting list student was promoted to active due to cancellation
+                    properties:
+                      enrollment_id:
+                        type: string
+                      student_id:
+                        type: string
+                      student_name:
+                        type: string
+                    example: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Enrollments
+      summary: Cancel enrollment
+      description: Cancel student enrollment in class. If student was waiting, remove from list. If student was active and class has waiting list, promote first waiting student.
+      operationId: deleteEnrollment
+      security:
+        - oauth2: [write:users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Enrollment ID
+          schema:
+            type: string
+            example: enroll_789ghi
+      responses:
+        '200':
+          description: Enrollment cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Enrollment cancelled
+                  promoted_student:
+                    type: object
+                    nullable: true
+                    description: Student promoted from waiting list to active (if applicable)
+                    properties:
+                      enrollment_id:
+                        type: string
+                      student_id:
+                        type: string
+                      student_name:
+                        type: string
+                    example: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/initiate:
+    post:
+      tags:
+        - Payments
+      summary: Initiate payment for enrollment
+      description: Create Stripe PaymentIntent for student to pay for class enrollment. Money goes directly to academy's Stripe Connect account.
+      operationId: initiatePayment
+      security:
+        - oauth2: [write:payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrollment_id]
+              properties:
+                enrollment_id:
+                  type: string
+                  description: Enrollment ID for which payment is being made
+                  example: enroll_789ghi
+                amount:
+                  type: number
+                  format: float
+                  description: Optional. If not provided, uses enrollment amount_due
+                  example: 150.00
+      responses:
+        '200':
+          description: PaymentIntent created. Client can now collect card details.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client_secret, payment_intent_id, amount, currency]
+                properties:
+                  client_secret:
+                    type: string
+                    description: Stripe client secret for frontend payment element
+                    example: pi_1234567890_secret_abcdef
+                  payment_intent_id:
+                    type: string
+                    description: Stripe PaymentIntent ID (for tracking)
+                    example: pi_1234567890
+                  amount:
+                    type: number
+                    format: float
+                    example: 150.00
+                  currency:
+                    type: string
+                    example: MXN
+                  academy_id:
+                    type: string
+                    example: acad_123abc
+                  enrollment_id:
+                    type: string
+                    example: enroll_789ghi
+                  message:
+                    type: string
+                    example: PaymentIntent created. Collect card details on frontend and submit to /payments/confirm
+        '400':
+          description: Invalid enrollment or payment amount
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/confirm:
+    post:
+      tags:
+        - Payments
+      summary: Confirm payment (after card details collected)
+      description: Called after Stripe payment element collects card details. Frontend submits PaymentIntent details. Webhook will also confirm payment.
+      operationId: confirmPayment
+      security:
+        - oauth2: [write:payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_intent_id, enrollment_id]
+              properties:
+                payment_intent_id:
+                  type: string
+                  description: Stripe PaymentIntent ID
+                  example: pi_1234567890
+                enrollment_id:
+                  type: string
+                  description: Enrollment being paid for
+                  example: enroll_789ghi
+      responses:
+        '200':
+          description: Payment confirmed and processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+                  enrollment_updated:
+                    type: object
+                    properties:
+                      enrollment_id:
+                        type: string
+                      status:
+                        type: string
+                        example: active
+                      payment_status:
+                        type: string
+                        example: paid
+                  invoice:
+                    type: object
+                    description: Auto-generated invoice
+                    properties:
+                      invoice_id:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+                    example: Payment successful. Invoice created.
+        '400':
+          description: Payment failed or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments:
+    get:
+      tags:
+        - Payments
+      summary: List payments
+      description: Get list of all payments. Admins see all, receptionists see academy payments, students see own, instructors see their class enrollments' payments.
+      operationId: listPayments
+      security:
+        - oauth2: [read:payments]
+      parameters:
+        - name: enrollment_id
+          in: query
+          description: Filter by enrollment
+          schema:
+            type: string
+        - name: student_id
+          in: query
+          description: Filter by student (admin/receptionist only)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by payment status
+          schema:
+            type: string
+            enum: [pending, succeeded, failed, refunded]
+        - name: start_date
+          in: query
+          description: Filter payments after date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Filter payments before date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          description: Number of results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+                  total:
+                    type: integer
+                    example: 250
+                  total_amount:
+                    type: number
+                    format: float
+                    description: Sum of all filtered payments
+                    example: 37500.00
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /payments/{id}:
+    get:
+      tags:
+        - Payments
+      summary: Get payment details
+      description: Get specific payment with full details (enrollment, student, class, invoice)
+      operationId: getPayment
+      security:
+        - oauth2: [read:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Payment ID
+          schema:
+            type: string
+            example: pay_123abc
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Payments
+      summary: Update payment (admin only)
+      description: Update payment notes or manually mark as paid (for cash payments handled outside Stripe)
+      operationId: updatePayment
+      security:
+        - oauth2: [write:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Payment ID
+          schema:
+            type: string
+            example: pay_123abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  example: Payment received via transfer
+      responses:
+        '200':
+          description: Payment updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/{id}/refund:
+    post:
+      tags:
+        - Payments
+      summary: Issue refund
+      description: Refund a payment (full refund only). Only admin/receptionist. Refund goes back to student's card via Stripe.
+      operationId: refundPayment
+      security:
+        - oauth2: [write:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Payment ID
+          schema:
+            type: string
+            example: pay_123abc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  description: Reason for refund
+                  example: Student requested cancellation
+      responses:
+        '200':
+          description: Refund issued successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+                  refund:
+                    type: object
+                    properties:
+                      refund_id:
+                        type: string
+                        example: re_1234567890
+                      amount:
+                        type: number
+                        format: float
+                      status:
+                        type: string
+                        example: succeeded
+                      created_at:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+                    example: Refund of 150.00 MXN issued successfully
+        '400':
+          description: Cannot refund (already refunded, or invalid status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/cash:
+    post:
+      tags:
+        - Payments
+      summary: Register cash payment
+      description: Manually register a cash payment (receptionist receives cash, records here). Creates payment record and invoice.
+      operationId: createCashPayment
+      security:
+        - oauth2: [write:payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrollment_id, amount, payment_method]
+              properties:
+                enrollment_id:
+                  type: string
+                  description: Enrollment being paid for
+                  example: enroll_789ghi
+                amount:
+                  type: number
+                  format: float
+                  description: Amount received
+                  example: 150.00
+                payment_method:
+                  type: string
+                  enum: [cash, transfer, check, other]
+                  description: How payment was received
+                  example: cash
+                received_by:
+                  type: string
+                  description: Name of receptionist who received payment
+                  example: Maria Lopez
+                notes:
+                  type: string
+                  example: Payment received for April classes
+      responses:
+        '201':
+          description: Cash payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+                  enrollment_updated:
+                    type: object
+                    properties:
+                      enrollment_id:
+                        type: string
+                      payment_status:
+                        type: string
+                        example: paid
+                  invoice:
+                    type: object
+                    properties:
+                      invoice_id:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+                    example: Cash payment recorded. Invoice created.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /invoices:
+    get:
+      tags:
+        - Invoices
+      summary: List invoices
+      description: Get list of invoices. Admins see all, receptionists see academy, students see own, instructors see their class invoices.
+      operationId: listInvoices
+      security:
+        - oauth2: [read:payments]
+      parameters:
+        - name: student_id
+          in: query
+          description: Filter by student (admin/receptionist only)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by invoice status
+          schema:
+            type: string
+            enum: [issued, paid, unpaid, cancelled, refunded]
+        - name: start_date
+          in: query
+          description: Filter invoices after date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Filter invoices before date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          description: Number of results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invoice'
+                  total:
+                    type: integer
+                    example: 500
+                  total_amount:
+                    type: number
+                    format: float
+                    description: Sum of all invoice totals (filtered)
+                    example: 75000.00
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /invoices/{id}:
+    get:
+      tags:
+        - Invoices
+      summary: Get invoice details
+      description: Get full invoice with line items and payment details. Students can only see their own.
+      operationId: getInvoice
+      security:
+        - oauth2: [read:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Invoice ID
+          schema:
+            type: string
+            example: inv_456def
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /invoices/{id}/download:
+    get:
+      tags:
+        - Invoices
+      summary: Download invoice PDF
+      description: Download invoice as PDF file. Students can only download their own.
+      operationId: downloadInvoicePDF
+      security:
+        - oauth2: [read:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Invoice ID
+          schema:
+            type: string
+            example: inv_456def
+      responses:
+        '200':
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /invoices/{id}/send-email:
+    post:
+      tags:
+        - Invoices
+      summary: Send invoice to student email
+      description: Email invoice PDF to student. Receptionist or admin only.
+      operationId: sendInvoiceEmail
+      security:
+        - oauth2: [write:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Invoice ID
+          schema:
+            type: string
+            example: inv_456def
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                additional_message:
+                  type: string
+                  description: Optional message to include in email body
+                  example: Thank you for your enrollment!
+      responses:
+        '200':
+          description: Invoice email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invoice sent to carlos@example.com
+                  sent_to:
+                    type: string
+                    example: carlos@example.com
+                  sent_at:
+                    type: string
+                    format: date-time
+                    example: '2026-04-30T14:30:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/{id}/receipt:
+    get:
+      tags:
+        - Payments
+      summary: Download payment receipt
+      description: Download payment receipt as PDF (simpler than full invoice). Students can only download their own.
+      operationId: downloadPaymentReceipt
+      security:
+        - oauth2: [read:payments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Payment ID
+          schema:
+            type: string
+            example: pay_123abc
+      responses:
+        '200':
+          description: Receipt PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /attendance:
+    get:
+      tags:
+        - Attendance
+      summary: List attendance records
+      description: Get attendance records. Instructors see their classes, admins see all. Filter by class, date, student, or status.
+      operationId: listAttendance
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: class_id
+          in: query
+          description: Filter by class (instructor sees only their classes)
+          schema:
+            type: string
+        - name: student_id
+          in: query
+          description: Filter by student
+          schema:
+            type: string
+        - name: date
+          in: query
+          description: Filter by attendance date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: start_date
+          in: query
+          description: Filter attendance after date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Filter attendance before date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          description: Filter by attendance status
+          schema:
+            type: string
+            enum: [present, absent, excused]
+        - name: limit
+          in: query
+          description: Number of results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attendance:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AttendanceRecord'
+                  total:
+                    type: integer
+                    example: 150
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Attendance
+      summary: Record attendance (bulk or single)
+      description: Mark student(s) attendance for a class. Instructor records their class attendance. Supports single or bulk entry via QR code or manual entry.
+      operationId: recordAttendance
+      security:
+        - oauth2: [write:classes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [class_id, session_date]
+              properties:
+                class_id:
+                  type: string
+                  description: Class ID
+                  example: class_123abc
+                session_date:
+                  type: string
+                  format: date
+                  description: Date of attendance
+                  example: '2026-04-29'
+                records:
+                  type: array
+                  description: Array of attendance records (single or multiple students)
+                  items:
+                    type: object
+                    required: [student_id, status]
+                    properties:
+                      student_id:
+                        type: string
+                        example: user_456def
+                      status:
+                        type: string
+                        enum: [present, absent, excused]
+                        example: present
+                      notes:
+                        type: string
+                        nullable: true
+                        example: Arrived 10 minutes late
+                  minItems: 1
+      responses:
+        '201':
+          description: Attendance recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class_id:
+                    type: string
+                    example: class_123abc
+                  session_date:
+                    type: string
+                    format: date
+                    example: '2026-04-29'
+                  recorded_count:
+                    type: integer
+                    example: 15
+                  attendance:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AttendanceRecord'
+                  message:
+                    type: string
+                    example: Attendance recorded for 15 students
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden (instructor can only record for their classes)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /attendance/{id}:
+    get:
+      tags:
+        - Attendance
+      summary: Get attendance record details
+      operationId: getAttendanceRecord
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Attendance record ID
+          schema:
+            type: string
+            example: att_789ghi
+      responses:
+        '200':
+          description: Attendance record details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Attendance
+      summary: Update attendance record
+      description: Update attendance status (e.g., change absent to present, or add notes). Instructor or admin only.
+      operationId: updateAttendanceRecord
+      security:
+        - oauth2: [write:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Attendance record ID
+          schema:
+            type: string
+            example: att_789ghi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [present, absent, excused]
+                  example: present
+                notes:
+                  type: string
+                  nullable: true
+                  example: Marked present after confirmation
+      responses:
+        '200':
+          description: Attendance record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Attendance
+      summary: Delete attendance record
+      description: Remove/undo an attendance record. Admin only.
+      operationId: deleteAttendanceRecord
+      security:
+        - oauth2: [write:classes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Attendance record ID
+          schema:
+            type: string
+            example: att_789ghi
+      responses:
+        '200':
+          description: Attendance record deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Attendance record deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /attendance/summary:
+    get:
+      tags:
+        - Attendance
+      summary: Get attendance summary (statistics)
+      description: Get attendance statistics by student, class, or date range. Useful for reports and monitoring.
+      operationId: getAttendanceSummary
+      security:
+        - oauth2: [read:classes]
+      parameters:
+        - name: class_id
+          in: query
+          description: Filter by class
+          schema:
+            type: string
+        - name: student_id
+          in: query
+          description: Filter by student
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          description: Period start (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Period end (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Attendance summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  summary:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        student_id:
+                          type: string
+                          example: user_456def
+                        student_name:
+                          type: string
+                          example: Carlos Garcia
+                        class_id:
+                          type: string
+                          example: class_123abc
+                        class_name:
+                          type: string
+                          example: Yoga - Monday Morning
+                        total_sessions:
+                          type: integer
+                          example: 4
+                        present:
+                          type: integer
+                          example: 3
+                        absent:
+                          type: integer
+                          example: 1
+                        excused:
+                          type: integer
+                          example: 0
+                        attendance_rate:
+                          type: number
+                          format: float
+                          description: Percentage (0-100)
+                          example: 75.0
+                  total_records:
+                    type: integer
+                    example: 60
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/summary:
+    get:
+      tags:
+        - Dashboard
+      summary: Dashboard summary (high-level overview)
+      description: Get key metrics snapshot for the academy. Admin only. Shows revenue, students, classes, attendance overview.
+      operationId: getDashboardSummary
+      security:
+        - oauth2: [admin]
+      parameters:
+        - name: start_date
+          in: query
+          description: Period start (YYYY-MM-DD). Defaults to start of current month.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Period end (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  revenue:
+                    type: object
+                    description: Revenue metrics for the period
+                    properties:
+                      total_paid:
+                        type: number
+                        format: float
+                        description: Total revenue (paid invoices)
+                        example: 45000.00
+                      total_pending:
+                        type: number
+                        format: float
+                        description: Pending/unpaid invoices
+                        example: 8500.00
+                      total_refunded:
+                        type: number
+                        format: float
+                        description: Refunded amounts
+                        example: 2000.00
+                      growth_vs_previous_period:
+                        type: number
+                        format: float
+                        description: Percentage change from previous period
+                        example: 12.5
+                  students:
+                    type: object
+                    description: Student metrics
+                    properties:
+                      total_active:
+                        type: integer
+                        example: 250
+                      new_this_period:
+                        type: integer
+                        example: 18
+                      inactive:
+                        type: integer
+                        example: 5
+                  classes:
+                    type: object
+                    description: Class metrics
+                    properties:
+                      total_active:
+                        type: integer
+                        example: 12
+                      total_enrollments:
+                        type: integer
+                        example: 145
+                      average_utilization:
+                        type: number
+                        format: float
+                        description: "Average capacity utilization (%)"
+                        example: 72.5
+                  attendance:
+                    type: object
+                    description: Attendance metrics
+                    properties:
+                      average_attendance_rate:
+                        type: number
+                        format: float
+                        description: "Average attendance across all classes (%)"
+                        example: 78.3
+                      total_sessions:
+                        type: integer
+                        example: 48
+                      total_present:
+                        type: integer
+                        example: 780
+                  payments:
+                    type: object
+                    description: Payment method breakdown
+                    properties:
+                      stripe:
+                        type: number
+                        format: float
+                        example: 35000.00
+                      cash:
+                        type: number
+                        format: float
+                        example: 8000.00
+                      transfer:
+                        type: number
+                        format: float
+                        example: 2000.00
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/revenue:
+    get:
+      tags:
+        - Dashboard
+      summary: Revenue report
+      description: Detailed revenue breakdown by date, class, instructor, or category. Admin only.
+      operationId: getRevenueReport
+      security:
+        - oauth2: [admin]
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: Period start (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          description: Period end (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: group_by
+          in: query
+          description: Group results by dimension
+          schema:
+            type: string
+            enum: [day, week, month, class, instructor, category, payment_method]
+            default: day
+        - name: class_id
+          in: query
+          description: Filter by specific class
+          schema:
+            type: string
+        - name: instructor_id
+          in: query
+          description: Filter by instructor
+          schema:
+            type: string
+        - name: category_id
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revenue report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  group_by:
+                    type: string
+                    example: day
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label:
+                          type: string
+                          description: Date, class name, instructor name, etc. (depends on group_by)
+                          example: '2026-04-29'
+                        total_invoices:
+                          type: integer
+                          example: 5
+                        total_revenue:
+                          type: number
+                          format: float
+                          example: 750.00
+                        paid:
+                          type: number
+                          format: float
+                          example: 750.00
+                        pending:
+                          type: number
+                          format: float
+                          example: 0
+                        refunded:
+                          type: number
+                          format: float
+                          example: 0
+                  summary:
+                    type: object
+                    properties:
+                      total_revenue:
+                        type: number
+                        format: float
+                      total_paid:
+                        type: number
+                        format: float
+                      total_pending:
+                        type: number
+                        format: float
+                      total_refunded:
+                        type: number
+                        format: float
+                      average_per_day:
+                        type: number
+                        format: float
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/accounts-receivable:
+    get:
+      tags:
+        - Dashboard
+      summary: Accounts receivable (unpaid invoices)
+      description: List all unpaid invoices with aging (how long overdue). Admin/receptionist only.
+      operationId: getAccountsReceivable
+      security:
+        - oauth2: [admin]
+      parameters:
+        - name: sort_by
+          in: query
+          description: Sort results
+          schema:
+            type: string
+            enum: [due_date, amount, student_name, days_overdue]
+            default: due_date
+        - name: min_days_overdue
+          in: query
+          description: Show only invoices overdue by at least N days
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Unpaid invoices list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unpaid_invoices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        invoice_id:
+                          type: string
+                          example: inv_456def
+                        student_id:
+                          type: string
+                          example: user_456def
+                        student_name:
+                          type: string
+                          example: Carlos Garcia
+                        student_email:
+                          type: string
+                          example: carlos@example.com
+                        student_phone:
+                          type: string
+                          example: '+52-55-9876-5432'
+                        amount_due:
+                          type: number
+                          format: float
+                          example: 150.00
+                        issued_date:
+                          type: string
+                          format: date
+                          example: '2026-04-10'
+                        due_date:
+                          type: string
+                          format: date
+                          example: '2026-04-25'
+                        days_overdue:
+                          type: integer
+                          description: Negative if not yet due, positive if overdue
+                          example: 5
+                        class_name:
+                          type: string
+                          example: Yoga - Monday Morning
+                  summary:
+                    type: object
+                    properties:
+                      total_unpaid:
+                        type: number
+                        format: float
+                        description: Total unpaid amount
+                        example: 5250.00
+                      total_invoices:
+                        type: integer
+                        example: 18
+                      overdue_count:
+                        type: integer
+                        description: Number of invoices overdue
+                        example: 5
+                      overdue_amount:
+                        type: number
+                        format: float
+                        description: Total overdue amount
+                        example: 2100.00
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/costs:
+    get:
+      tags:
+        - Dashboard
+      summary: Costs and expenses report
+      description: Track operating costs (instructor salaries, facility rent, utilities, etc.). Admin only. (Optional feature for future)
+      operationId: getCostsReport
+      security:
+        - oauth2: [admin]
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: Period start (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          description: Period end (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          description: Filter by cost category (instructor_pay, rent, utilities, equipment, other)
+          schema:
+            type: string
+            enum: [instructor_pay, rent, utilities, equipment, other]
+      responses:
+        '200':
+          description: Costs report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  costs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category:
+                          type: string
+                          example: instructor_pay
+                        description:
+                          type: string
+                          example: April salary for Jane Smith
+                        amount:
+                          type: number
+                          format: float
+                          example: 8000.00
+                        date:
+                          type: string
+                          format: date
+                          example: '2026-04-30'
+                  summary:
+                    type: object
+                    properties:
+                      total_costs:
+                        type: number
+                        format: float
+                      by_category:
+                        type: object
+                        example:
+                          instructor_pay: 16000.00
+                          rent: 5000.00
+                          utilities: 800.00
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/students:
+    get:
+      tags:
+        - Dashboard
+      summary: Student metrics and growth
+      description: Student acquisition, retention, and engagement metrics. Admin only.
+      operationId: getStudentMetrics
+      security:
+        - oauth2: [admin]
+      parameters:
+        - name: start_date
+          in: query
+          description: Period start (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Period end (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Student metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overall:
+                    type: object
+                    properties:
+                      total_active:
+                        type: integer
+                        example: 250
+                      total_inactive:
+                        type: integer
+                        example: 12
+                      total_lifetime:
+                        type: integer
+                        example: 262
+                  growth:
+                    type: object
+                    properties:
+                      new_students:
+                        type: integer
+                        example: 18
+                      churned_students:
+                        type: integer
+                        example: 2
+                      net_growth:
+                        type: integer
+                        example: 16
+                      growth_rate:
+                        type: number
+                        format: float
+                        description: Percentage growth
+                        example: 6.8
+                  by_category:
+                    type: object
+                    description: Student distribution by subscription category
+                    example:
+                      Pool: 120
+                      Crossfit: 85
+                      Hyrox: 45
+                  retention:
+                    type: object
+                    properties:
+                      month_1_retention:
+                        type: number
+                        format: float
+                        description: "% of students active after 1 month"
+                        example: 92.5
+                      month_3_retention:
+                        type: number
+                        format: float
+                        example: 85.0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/profit-loss:
+    get:
+      tags:
+        - Dashboard
+      summary: Profit & Loss statement
+      description: Revenue minus costs. Shows profitability over time. Admin only.
+      operationId: getProfitLoss
+      security:
+        - oauth2: [admin]
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: Period start (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          description: Period end (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: P&L statement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  revenue:
+                    type: number
+                    format: float
+                    example: 45000.00
+                  costs:
+                    type: number
+                    format: float
+                    example: 22000.00
+                  gross_profit:
+                    type: number
+                    format: float
+                    example: 23000.00
+                  gross_margin:
+                    type: number
+                    format: float
+                    description: Percentage (0-100)
+                    example: 51.1
+                  net_profit:
+                    type: number
+                    format: float
+                    example: 23000.00
+                  profit_margin:
+                    type: number
+                    format: float
+                    description: Percentage (0-100)
+                    example: 51.1
+                  notes:
+                    type: string
+                    example: Strong month driven by new category enrollment
+
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          example: invalid_request
+        message:
+          type: string
+          example: Email is required
+        details:
+          type: object
+
+    Category:
+      type: object
+      required: [id, academy_id, name, created_at]
+      properties:
+        id:
+          type: string
+          example: cat_123abc
+        academy_id:
+          type: string
+          example: acad_123abc
+        name:
+          type: string
+          example: Pool
+        description:
+          type: string
+          example: Swimming pool classes and programs
+        color:
+          type: string
+          description: Hex color for UI display
+          example: '#0066CC'
+        monthly_fee:
+          type: number
+          format: float
+          nullable: true
+          description: Monthly subscription fee for this category
+          example: 1200.00
+        enrollment_fee:
+          type: number
+          format: float
+          nullable: true
+          description: One-time enrollment fee
+          example: 500.00
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T15:45:00Z'
+
+    Payment:
+      type: object
+      required: [id, academy_id, enrollment_id, amount, status, created_at]
+      properties:
+        id:
+          type: string
+          description: Internal payment ID
+          example: pay_123abc
+        academy_id:
+          type: string
+          example: acad_123abc
+        enrollment_id:
+          type: string
+          example: enroll_789ghi
+        student_id:
+          type: string
+          example: user_456def
+        student_name:
+          type: string
+          example: Carlos Garcia
+        student_email:
+          type: string
+          example: carlos@example.com
+        class_id:
+          type: string
+          example: class_123abc
+        class_name:
+          type: string
+          example: Yoga - Monday Morning
+        amount:
+          type: number
+          format: float
+          example: 150.00
+        currency:
+          type: string
+          example: MXN
+        status:
+          type: string
+          enum: [pending, succeeded, failed, refunded]
+          description: Payment status
+          example: succeeded
+        payment_method:
+          type: string
+          enum: [stripe, cash, transfer, check, other]
+          description: How payment was made
+          example: stripe
+        stripe_payment_intent_id:
+          type: string
+          nullable: true
+          description: Stripe PaymentIntent ID (if paid via Stripe)
+          example: pi_1234567890
+        invoice_id:
+          type: string
+          nullable: true
+          description: Associated invoice ID
+          example: inv_456def
+        refund_info:
+          type: object
+          nullable: true
+          description: Refund details (if payment was refunded)
+          properties:
+            refund_id:
+              type: string
+              example: re_1234567890
+            refund_amount:
+              type: number
+              format: float
+              example: 150.00
+            refund_status:
+              type: string
+              example: succeeded
+            refund_reason:
+              type: string
+              example: Student requested cancellation
+            refunded_at:
+              type: string
+              format: date-time
+              example: '2026-04-30T11:00:00Z'
+        notes:
+          type: string
+          nullable: true
+          example: null
+        received_by:
+          type: string
+          nullable: true
+          description: Name of receptionist (for cash payments)
+          example: null
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T15:45:00Z'
+
+    AuthTokenResponse:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+          description: JWT access token (expires in 30 minutes)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEyMyIsImFjYWRlbXlfaWQiOiJhY2FkXzEyMyIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTcxNDQ0ODAwMH0.signature
+        refresh_token:
+          type: string
+          description: JWT refresh token (expires in 30 days)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEyMyIsImV4cCI6MTcxNzA0MDAwMH0.signature
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Access token expiry in seconds
+          example: 1800
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [id, email, first_name, last_name, role, is_active, created_at]
+      properties:
+        id:
+          type: string
+          example: user_123abc
+        email:
+          type: string
+          format: email
+          example: john@academy.com
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Doe
+        role:
+          type: string
+          enum: [admin, receptionist, instructor, student]
+          description: Role in the academy referenced by academy_id (from JWT)
+          example: instructor
+        is_active:
+          type: boolean
+          description: Whether the user account is active
+          example: true
+        phone:
+          type: string
+          nullable: true
+          example: '+52-55-1234-5678'
+        address:
+          type: string
+          nullable: true
+          example: Calle Principal 123, Ciudad de México
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+          example: '1990-05-15'
+        academy_id:
+          type: string
+          description: Active academy context (from JWT). A user may belong to multiple academies.
+          example: acad_123abc
+        hourly_rate:
+          type: number
+          format: float
+          nullable: true
+          description: Instructor-only. Hourly rate for payroll calculations in current academy context.
+          example: 250.00
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the user verified their email. Null if not verified.
+          example: '2026-04-29T10:30:00Z'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T15:45:00Z'
+
+    Class:
+      type: object
+      required: [id, academy_id, name, instructor_id, schedule_day, schedule_time, status, created_at]
+      properties:
+        id:
+          type: string
+          example: class_123abc
+        academy_id:
+          type: string
+          example: acad_123abc
+        name:
+          type: string
+          example: Yoga - Monday Morning
+        description:
+          type: string
+          example: Beginner yoga class for adults
+        instructor:
+          $ref: '#/components/schemas/InstructorSummary'
+        schedule_day:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+          example: monday
+        schedule_time:
+          type: string
+          format: time
+          example: '09:00'
+        duration_minutes:
+          type: integer
+          example: 60
+        recurrence:
+          type: string
+          enum: [weekly, one_time]
+          description: Whether class repeats weekly or is one-time only
+          example: weekly
+        max_students:
+          type: integer
+          nullable: true
+          description: Capacity limit. Null means unlimited enrollment.
+          example: 20
+        enrolled_students:
+          type: integer
+          example: 15
+        waiting_list_count:
+          type: integer
+          description: Number of students on waiting list (if class is at capacity)
+          example: 3
+        categories:
+          type: array
+          description: Categories this class belongs to (controls visibility for students)
+          items:
+            $ref: '#/components/schemas/Category'
+          example:
+            - id: cat_pool
+              name: Pool
+            - id: cat_wellness
+              name: Wellness
+        price:
+          type: number
+          format: float
+          example: 150.00
+        location:
+          type: string
+          example: Studio A, Building 1
+        status:
+          type: string
+          enum: [active, archived, draft]
+          example: active
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T15:45:00Z'
+
+    InstructorSummary:
+      type: object
+      required: [id, first_name, last_name, email]
+      properties:
+        id:
+          type: string
+          example: user_123abc
+        first_name:
+          type: string
+          example: Jane
+        last_name:
+          type: string
+          example: Smith
+        email:
+          type: string
+          format: email
+          example: jane@academy.com
+
+    AttendanceRecord:
+      type: object
+      required: [id, class_id, student_id, session_date, status, created_at]
+      properties:
+        id:
+          type: string
+          description: Attendance record ID
+          example: att_789ghi
+        academy_id:
+          type: string
+          example: acad_123abc
+        class_id:
+          type: string
+          example: class_123abc
+        class_name:
+          type: string
+          example: Yoga - Monday Morning
+        class_schedule:
+          type: object
+          properties:
+            day:
+              type: string
+              example: monday
+            time:
+              type: string
+              format: time
+              example: '09:00'
+        student_id:
+          type: string
+          example: user_456def
+        student_name:
+          type: string
+          example: Carlos Garcia
+        student_email:
+          type: string
+          example: carlos@example.com
+        session_date:
+          type: string
+          format: date
+          description: Date of the class
+          example: '2026-04-29'
+        status:
+          type: string
+          enum: [present, absent, excused]
+          description: Attendance status
+          example: present
+        notes:
+          type: string
+          nullable: true
+          example: Arrived 10 minutes late
+        recorded_by:
+          type: string
+          description: Instructor or admin who recorded attendance
+          example: user_123abc
+        recorded_at:
+          type: string
+          format: date-time
+          description: When attendance was recorded
+          example: '2026-04-29T09:15:00Z'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T09:15:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T09:15:00Z'
+
+    Enrollment:
+      type: object
+      required: [id, student_id, class_id, status, enrolled_at, academy_id]
+      properties:
+        id:
+          type: string
+          example: enroll_789ghi
+        academy_id:
+          type: string
+          example: acad_123abc
+        student_id:
+          type: string
+          example: user_456def
+        student_name:
+          type: string
+          example: Carlos Garcia
+        student_email:
+          type: string
+          example: carlos@example.com
+        class_id:
+          type: string
+          example: class_123abc
+        class_name:
+          type: string
+          example: Yoga - Monday Morning
+        class_schedule:
+          type: object
+          description: Class schedule details
+          properties:
+            day:
+              type: string
+              example: monday
+            time:
+              type: string
+              format: time
+              example: '09:00'
+            location:
+              type: string
+              example: Studio A
+        instructor_name:
+          type: string
+          example: Jane Smith
+        instructor_id:
+          type: string
+          example: user_123abc
+        status:
+          type: string
+          enum: [active, completed, cancelled, waiting]
+          description: active (enrolled), completed (class finished), cancelled (dropped), waiting (on waiting list)
+          example: active
+        waiting_position:
+          type: integer
+          nullable: true
+          description: Position in waiting list (null if not waiting)
+          example: null
+        enrolled_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        amount_due:
+          type: number
+          format: float
+          example: 150.00
+        payment_id:
+          type: string
+          nullable: true
+          description: Stripe payment ID (if payment was made)
+          example: pi_1234567890
+        notes:
+          type: string
+          nullable: true
+          example: null
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T15:45:00Z'
+
+    Invoice:
+      type: object
+      required: [id, academy_id, student_id, total, status, issued_date, created_at]
+      properties:
+        id:
+          type: string
+          description: Invoice ID (e.g., INV-2026-00001)
+          example: inv_456def
+        academy_id:
+          type: string
+          example: acad_123abc
+        academy_name:
+          type: string
+          example: My Sports Academy
+        student_id:
+          type: string
+          example: user_456def
+        student_name:
+          type: string
+          example: Carlos Garcia
+        student_email:
+          type: string
+          example: carlos@example.com
+        payment_id:
+          type: string
+          nullable: true
+          description: Associated payment ID
+          example: pay_123abc
+        line_items:
+          type: array
+          description: Services/classes charged in this invoice
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+                example: Yoga - Monday Morning (1 class)
+              class_id:
+                type: string
+                example: class_123abc
+              enrollment_id:
+                type: string
+                example: enroll_789ghi
+              quantity:
+                type: integer
+                description: Number of classes/months/units
+                example: 1
+              unit_price:
+                type: number
+                format: float
+                example: 150.00
+              amount:
+                type: number
+                format: float
+                example: 150.00
+        subtotal:
+          type: number
+          format: float
+          example: 150.00
+        tax:
+          type: number
+          format: float
+          nullable: true
+          description: Optional tax/VAT amount
+          example: null
+        discount:
+          type: number
+          format: float
+          nullable: true
+          description: Optional discount applied
+          example: null
+        total:
+          type: number
+          format: float
+          example: 150.00
+        currency:
+          type: string
+          example: MXN
+        status:
+          type: string
+          enum: [issued, paid, unpaid, cancelled, refunded]
+          description: Invoice status
+          example: paid
+        payment_method:
+          type: string
+          nullable: true
+          enum: [stripe, cash, transfer, check, other]
+          description: How payment was made (if paid)
+          example: stripe
+        payment_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date payment was received
+          example: '2026-04-29T10:30:00Z'
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Payment due date (if invoice not yet paid)
+          example: null
+        issued_date:
+          type: string
+          format: date
+          example: '2026-04-29'
+        notes:
+          type: string
+          nullable: true
+          example: Thank you for your enrollment!
+        pdf_url:
+          type: string
+          nullable: true
+          description: URL to download PDF (if generated)
+          example: /invoices/inv_456def/download
+        email_history:
+          type: array
+          description: Record of email sends
+          items:
+            type: object
+            properties:
+              sent_at:
+                type: string
+                format: date-time
+              sent_to:
+                type: string
+              sent_by:
+                type: string
+          example:
+            - sent_at: '2026-04-29T10:35:00Z'
+              sent_to: carlos@example.com
+              sent_by: system
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-04-29T15:45:00Z'
+
+  responses:
+    BadRequest:
+      description: Bad request (validation error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: validation_error
+            message: Email is required
+
+    Unauthorized:
+      description: Unauthorized (invalid/missing token)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: unauthorized
+            message: Invalid or expired token
+
+    Forbidden:
+      description: Forbidden (insufficient permissions)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: forbidden
+            message: Only admins can perform this action
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: not_found
+            message: User not found
+
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth2 Authorization Code flow
+      flows:
+        authorizationCode:
+          authorizationUrl: 'https://api.academy-management.com/oauth/authorize'
+          tokenUrl: 'https://api.academy-management.com/api/v1/auth/login'
+          refreshUrl: 'https://api.academy-management.com/api/v1/auth/refresh-token'
+          scopes:
+            read:profile: Read user profile
+            read:academy: Read academy data
+            read:users: List users
+            read:classes: Read class data
+            read:payments: Read payment data
+            write:profile: Update user profile
+            write:academy: Manage academy
+            write:users: Create/update/delete users
+            write:classes: Create/update/delete classes
+            write:payments: Process payments
+            admin: Full access

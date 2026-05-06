@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AcademiaPro — Software para Academias</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body class="public-page">
+
+  <!-- NAVBAR -->
+  <nav class="public-nav">
+    <div class="public-nav-inner">
+      <a href="index.html" class="nav-logo">
+        <div class="nav-logo-icon">🎭</div>
+        AcademiaPro
+      </a>
+      <div class="nav-links">
+        <a href="#features">Funciones</a>
+        <a href="#roles">Roles</a>
+        <a href="#pricing">Precios</a>
+      </div>
+      <div class="nav-actions">
+        <a href="pages/login.html" class="btn btn-outline btn-sm">Iniciar sesión</a>
+        <a href="pages/register.html" class="btn btn-primary btn-sm">Empezar gratis</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container hero-content">
+      <div class="hero-eyebrow">✨ Software para Academias de Arte, Deporte y Música</div>
+      <h1>Gestiona tu academia<br><span>sin complicaciones</span></h1>
+      <p>Inscripciones, pagos, asistencia, nómina e informes financieros en una sola plataforma. Diseñado para academias que quieren crecer.</p>
+      <div class="hero-actions">
+        <a href="pages/register.html" class="btn btn-white btn-xl">Crear cuenta gratis</a>
+        <a href="pages/login.html" class="btn btn-white-outline btn-xl">Ver demo →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features-section" id="features">
+    <div class="container">
+      <div class="text-center">
+        <div class="section-label">Funcionalidades</div>
+        <h2 class="section-heading">Todo lo que necesita tu academia</h2>
+        <p class="section-desc" style="margin:0 auto">Desde la inscripción del primer alumno hasta los reportes de fin de mes, AcademiaPro cubre cada proceso.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">📚</div>
+          <h3>Gestión de Clases</h3>
+          <p>Crea clases recurrentes o eventuales, define horarios, capacidades y asigna instructores. Control total del catálogo.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📝</div>
+          <h3>Inscripciones</h3>
+          <p>Proceso de inscripción fluido con lista de espera automática, cancelaciones y re-inscripciones en un clic.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏷️</div>
+          <h3>Suscripciones por Categoría</h3>
+          <p>Define planes de membresía con acceso a grupos específicos de clases. Controla qué ve y puede inscribir cada alumno.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💳</div>
+          <h3>Pagos con Stripe</h3>
+          <p>Cobra con tarjeta de crédito/débito via Stripe, o registra pagos en efectivo, transferencia y cheque manualmente.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">✅</div>
+          <h3>Control de Asistencia</h3>
+          <p>Pasa lista en segundos desde la vista del instructor. Estadísticas de asistencia por alumno y por clase.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💰</div>
+          <h3>Nómina de Instructores</h3>
+          <p>Calcula automáticamente el pago de instructores por hora desde los registros de asistencia. Múltiples tipos de contrato.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Reportes Financieros</h3>
+          <p>Dashboard completo con ingresos, gastos, cuentas por cobrar y estado de resultados mensual y anual.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📧</div>
+          <h3>Notificaciones por Email</h3>
+          <p>Invitaciones, recordatorios de pago, facturas, comprobantes y avisos a alumnos e instructores de forma automática.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROLES -->
+  <section class="roles-section" id="roles">
+    <div class="container">
+      <div class="text-center">
+        <div class="section-label">Roles y Permisos</div>
+        <h2 class="section-heading">Una plataforma, cuatro experiencias</h2>
+        <p class="section-desc" style="margin:0 auto">Cada usuario ve exactamente lo que necesita. Nada más, nada menos.</p>
+      </div>
+      <div class="roles-grid">
+        <div class="role-card role-admin">
+          <div class="role-icon">👑</div>
+          <span class="role-badge" style="background:#e0e7ff;color:#4338ca">Admin</span>
+          <h3>Administrador</h3>
+          <p>Control total de la academia. Acceso a reportes financieros, configuración, nómina e historial completo.</p>
+          <div class="role-features">
+            <div class="role-feature">Gestión completa de usuarios</div>
+            <div class="role-feature">Reportes y finanzas</div>
+            <div class="role-feature">Configuración de marca</div>
+            <div class="role-feature">Conexión con Stripe</div>
+          </div>
+        </div>
+        <div class="role-card role-receptionist">
+          <div class="role-icon">💼</div>
+          <span class="role-badge" style="background:#ede9fe;color:#6d28d9">Recepcionista</span>
+          <h3>Recepcionista</h3>
+          <p>Gestiona el día a día: inscripciones, cobros, alumnos e instructores sin acceso a información financiera sensible.</p>
+          <div class="role-features">
+            <div class="role-feature">Registro de alumnos</div>
+            <div class="role-feature">Cobros y facturas</div>
+            <div class="role-feature">Gestión de inscripciones</div>
+            <div class="role-feature">Nómina de instructores</div>
+          </div>
+        </div>
+        <div class="role-card role-instructor">
+          <div class="role-icon">🧑‍🏫</div>
+          <span class="role-badge" style="background:#cffafe;color:#0e7490">Instructor</span>
+          <h3>Instructor</h3>
+          <p>Vista enfocada en sus clases. Pasa lista, ve el roster de alumnos y consulta su estado de pago de nómina.</p>
+          <div class="role-features">
+            <div class="role-feature">Ver sus clases asignadas</div>
+            <div class="role-feature">Tomar asistencia</div>
+            <div class="role-feature">Ver roster de alumnos</div>
+            <div class="role-feature">Estado de su pago</div>
+          </div>
+        </div>
+        <div class="role-card role-student">
+          <div class="role-icon">🎓</div>
+          <span class="role-badge" style="background:#d1fae5;color:#065f46">Estudiante</span>
+          <h3>Estudiante</h3>
+          <p>Portal de autoservicio para ver clases disponibles, inscribirse, pagar en línea y revisar su asistencia.</p>
+          <div class="role-features">
+            <div class="role-feature">Explorar clases disponibles</div>
+            <div class="role-feature">Inscripción y lista de espera</div>
+            <div class="role-feature">Pago con tarjeta (Stripe)</div>
+            <div class="role-feature">Historial de asistencia</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing-section" id="pricing">
+    <div class="container">
+      <div class="text-center">
+        <div class="section-label">Planes</div>
+        <h2 class="section-heading">Precios claros, sin sorpresas</h2>
+        <p class="section-desc" style="margin:0 auto">Todos los planes incluyen acceso completo. Solo varía el número de alumnos.</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-tier">Starter</div>
+          <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">Para academias pequeñas que están empezando</p>
+          <div class="pricing-price">
+            <span class="pricing-currency">$</span>
+            <span class="pricing-amount">299</span>
+            <span class="pricing-period">/mes MXN</span>
+          </div>
+          <div class="pricing-features">
+            <div class="pricing-feature"><span class="check">✓</span> Hasta 50 alumnos activos</div>
+            <div class="pricing-feature"><span class="check">✓</span> Clases y asistencia ilimitadas</div>
+            <div class="pricing-feature"><span class="check">✓</span> 2 instructores</div>
+            <div class="pricing-feature"><span class="check">✓</span> Pagos con Stripe</div>
+            <div class="pricing-feature muted"><span class="x">—</span> Reportes financieros avanzados</div>
+            <div class="pricing-feature muted"><span class="x">—</span> Múltiples recepcionistas</div>
+          </div>
+          <a href="pages/register.html" class="btn btn-outline btn-block">Comenzar gratis</a>
+        </div>
+
+        <div class="pricing-card popular">
+          <div class="popular-badge">MÁS POPULAR</div>
+          <div class="pricing-tier">Profesional</div>
+          <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">Para academias en crecimiento con múltiples disciplinas</p>
+          <div class="pricing-price">
+            <span class="pricing-currency">$</span>
+            <span class="pricing-amount">799</span>
+            <span class="pricing-period">/mes MXN</span>
+          </div>
+          <div class="pricing-features">
+            <div class="pricing-feature"><span class="check">✓</span> Hasta 200 alumnos activos</div>
+            <div class="pricing-feature"><span class="check">✓</span> Clases y asistencia ilimitadas</div>
+            <div class="pricing-feature"><span class="check">✓</span> Instructores ilimitados</div>
+            <div class="pricing-feature"><span class="check">✓</span> Pagos con Stripe</div>
+            <div class="pricing-feature"><span class="check">✓</span> Reportes financieros completos</div>
+            <div class="pricing-feature"><span class="check">✓</span> Múltiples recepcionistas</div>
+          </div>
+          <a href="pages/register.html" class="btn btn-primary btn-block">Comenzar gratis</a>
+        </div>
+
+        <div class="pricing-card">
+          <div class="pricing-tier">Enterprise</div>
+          <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">Para redes de academias o centros deportivos grandes</p>
+          <div class="pricing-price">
+            <span class="pricing-currency">$</span>
+            <span class="pricing-amount">1,499</span>
+            <span class="pricing-period">/mes MXN</span>
+          </div>
+          <div class="pricing-features">
+            <div class="pricing-feature"><span class="check">✓</span> Alumnos ilimitados</div>
+            <div class="pricing-feature"><span class="check">✓</span> Multi-sede</div>
+            <div class="pricing-feature"><span class="check">✓</span> Instructores ilimitados</div>
+            <div class="pricing-feature"><span class="check">✓</span> Pagos con Stripe</div>
+            <div class="pricing-feature"><span class="check">✓</span> Reportes financieros + exportación</div>
+            <div class="pricing-feature"><span class="check">✓</span> Soporte prioritario + onboarding</div>
+          </div>
+          <a href="pages/register.html" class="btn btn-outline btn-block">Contactar ventas</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="cta-section">
+    <div class="container">
+      <h2>¿Listo para modernizar tu academia?</h2>
+      <p>Empieza hoy gratis. Sin tarjeta de crédito. Sin compromisos.</p>
+      <div class="hero-actions">
+        <a href="pages/register.html" class="btn btn-white btn-xl">Crear cuenta gratis</a>
+        <a href="pages/login.html" class="btn btn-white-outline btn-xl">Explorar el demo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="public-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo">
+            <div class="nav-logo-icon">🎭</div>
+            AcademiaPro
+          </a>
+          <p>Software especializado para academias de artes, deporte y música. Hecho en México 🇲🇽</p>
+        </div>
+        <div class="footer-col">
+          <h4>Producto</h4>
+          <a href="#features">Funcionalidades</a>
+          <a href="#pricing">Precios</a>
+          <a href="#roles">Roles</a>
+        </div>
+        <div class="footer-col">
+          <h4>Empresa</h4>
+          <a href="#">Acerca de</a>
+          <a href="#">Blog</a>
+          <a href="#">Contacto</a>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <a href="#">Términos de uso</a>
+          <a href="#">Privacidad</a>
+          <a href="#">Cookies</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 AcademiaPro. Todos los derechos reservados.</span>
+        <span>Hecho con ❤️ para academias</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/mock-data.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    /* Si ya hay sesión activa, mostrar botón "Ir al dashboard" en nav */
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = Auth.getCurrentUser();
+      if (user) {
+        const actions = document.querySelector('.nav-actions');
+        actions.innerHTML = `
+          <span style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">Sesión: <strong>${user.first_name}</strong></span>
+          <a href="pages/home.html" class="btn btn-primary btn-sm">Ir al dashboard →</a>`;
+      }
+    });
+  </script>
+</body>
+</html>

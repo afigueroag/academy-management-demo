@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Registro de Academia</title>
+    <style>
+        div {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        Logo (Navigate to home.html) | ... | Inicio (Navigate to home.html) | Iniciar Sesión (Navigate to login.html)
+    </div>
+    <div class="register-page">
+        <div class="register-intro">
+            Indicación clara: este registro crea una nueva academia (acad_*) con su administrador principal (rol=admin). Los demás roles (Receptionist, Instructor, Student) se incorporan posteriormente por invitación desde el panel del Admin.
+        </div>
+        <div class="register-form">
+            <div class="academy-info-section">
+                Nombre de la academia (academies.name) y descripción breve. Opcionalmente subir logo y elegir paleta de colores para personalizar la UI.
+                Lista inicial de categorías de suscripción (Pool, Crossfit, Yoga, etc.); cada una se guarda en categories con monthly_fee y enrollment_fee. Pueden agregarse más después en Categorías.
+            </div>
+            <div class="admin-info-section">
+                Nombre, apellido, correo y contraseña del administrador principal. Llama a POST /auth/signup. El correo recibirá un enlace de verificación obligatorio antes del primer inicio de sesión.
+            </div>
+            <div class="subscription-section">
+                Selector de plan del SaaS (mensual/anual) y detalle de funcionalidades incluidas.
+            </div>
+            <div class="payment-section">
+                Datos de tarjeta para pagar la suscripción del SaaS (Stripe estándar).
+                Nota: la academia podrá conectar su propia cuenta de Stripe Connect después del registro, desde Configuración, para recibir directamente los pagos de sus estudiantes.
+            </div>
+            <div class="form-actions">
+                Botón de crear cuenta. Enlace para iniciar sesión si ya tiene cuenta (Navigate to login.html).
+                (Estado éxito) Pantalla de confirmación pidiendo verificar el correo antes de iniciar sesión (Navigate to email-verification.html).
+            </div>
+        </div>
+    </div>
+</body>
+</html>

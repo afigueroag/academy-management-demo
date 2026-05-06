@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Inicio</title>
+    <style>
+        div {
+            border: 1px solid black;
+        }
+        .main-page {
+            display: flex;
+        }
+        .main-content {
+            flex: 1 1 auto;
+        }
+        .side-action {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <!-- (include _layout.html) -->
+    <div class="main-page">
+        <div class="main-content">
+            <div class="scorecards-section">
+                4 tarjetas adaptadas por rol:
+                (Admin) Ingresos del Mes (transactions type=income, status=succeeded), Estudiantes Activos, Cuentas por Cobrar (suma de pending), Asistencia Promedio.
+                (Receptionist) Pagos Recibidos Hoy, Pagos Pendientes, Estudiantes con Deuda, Próximas Inscripciones.
+                (Instructor) Clases Hoy, Estudiantes en Mis Clases, Horas Reportadas Este Mes (computado de attendance), Pago Pendiente.
+                (Student) Mis Clases Activas, Próxima Clase, Deuda Total, Mi Asistencia.
+            </div>
+            <div class="role-dashboard-section">
+                (Admin) Gráfica de barras con ingresos por mes en el año fiscal y lista de cuentas por cobrar (basada en /dashboard/accounts-receivable) con: estudiante, monto, due_date, días vencidos y CTA (recordar por correo, registrar pago, ver detalles).
+                (Estado vacío Admin) Si no hay actividad registrada, mensaje de bienvenida con CTAs para invitar al primer estudiante (Navigate to students.html) y crear la primera clase (Navigate to classes.html).
+                (Receptionist) Gráfica de barras con pagos pendientes por mes y lista de invoices por cobrar con datos del estudiante y CTA (recordar, registrar pago en efectivo, ver detalles).
+                (Estado vacío Receptionist) Si no hay pagos pendientes: "Todo al corriente."
+                (Instructor) Lista de clases asignadas activas con: nombre, próxima sesión (schedule_day + schedule_time), estudiantes inscritos vs en lista de espera, y CTA (pasar asistencia, mandar notificación, ver detalles).
+                (Estado vacío Instructor) Si no hay clases asignadas, mensaje indicando que el Admin debe asignarle clases.
+                (Student) Lista de enrollments activas (incluyendo status=waiting con waiting_position visible) con: clase, instructor, próxima sesión, estado de pago y CTA (cancelar inscripción, pagar, ver detalles).
+                (Estado vacío Student) Si no tiene enrollments, mensaje con CTA para explorar clases disponibles según sus categorías de suscripción (Navigate to classes.html).
+            </div>
+        </div>
+        <div class="side-action">
+            No es visible inicialmente, solo cuando se selecciona un CTA específico debe aparecer por encima del contenido principal con un fondo semitransparente.
+            (Admin, Receptionist)
+            - Registrar pago en efectivo (POST /payments/cash): enrollment_id, amount, payment_method (cash/transfer/check), recibido por, notas. Genera invoice automática.
+            - Recordatorio por correo (POST /invoices/{id}/send-email): reenvía la invoice pendiente al correo del estudiante.
+            - Mostrar detalles de contacto del estudiante (datos de users + user_academies).
+            (Instructor)
+            - Pasar asistencia (POST /attendance bulk): selector de fecha, lista de inscritos con switches present/absent/excused y notas opcionales.
+            - Mandar notificación a estudiantes de la clase.
+            - Mostrar detalles de la clase.
+            (Student)
+            - Confirmar cancelación de inscripción (DELETE /enrollments/{id}). Si había lista de espera, se promueve al primer estudiante automáticamente.
+            - Pagar inscripción (flujo Stripe en 2 pasos): POST /payments/initiate retorna client_secret → recolectar tarjeta con Stripe Element → POST /payments/confirm con payment_intent_id. Al finalizar, recibo descargable.
+            - Mostrar detalles de la clase y horario.
+        </div>
+    </div>
+</body>
+</html>
