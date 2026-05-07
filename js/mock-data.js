@@ -7,7 +7,7 @@ window.MOCK_DB = {
 
   academy: {
     id: 'acad_001',
-    name: 'Academia Arte y Movimiento',
+    name: 'Academia Bushido — Artes Marciales',
     is_active: true,
     theme: {
       colorPrimary: '#6366f1',
@@ -17,7 +17,7 @@ window.MOCK_DB = {
     logo: null,
     address: 'Av. Insurgentes Sur 1234, CDMX',
     phone: '+52 55 5678 9012',
-    email: 'contacto@arteymovimiento.mx',
+    email: 'contacto@academiabushido.mx',
     rfc: 'AAM2024010101',
     fiscal_year_start: 1,
     tax_rate: 16,
@@ -25,6 +25,69 @@ window.MOCK_DB = {
     plan: 'profesional',
     plan_expires: '2026-12-31'
   },
+
+  /* ── Planes de membresía ──────────────────────────────────────── */
+  plans: [
+    {
+      id: 'plan_001',
+      academy_id: 'acad_001',
+      name: 'Plan Básico',
+      description: 'Acceso a una disciplina a nivel principiante. Clases sin prerrequisito de cinta.',
+      color: '#10b981',
+      monthly_fee: 500,
+      enrollment_fee: 200,
+      is_active: true,
+      created_at: '2024-01-15T08:00:00Z'
+    },
+    {
+      id: 'plan_002',
+      academy_id: 'acad_001',
+      name: 'Plan Intermedio',
+      description: 'Acceso a todas las disciplinas hasta nivel cinta verde.',
+      color: '#6366f1',
+      monthly_fee: 800,
+      enrollment_fee: 300,
+      is_active: true,
+      created_at: '2024-01-15T08:00:00Z'
+    },
+    {
+      id: 'plan_003',
+      academy_id: 'acad_001',
+      name: 'Plan Negro',
+      description: 'Acceso ilimitado a todas las clases, todos los niveles y sesiones de competencia.',
+      color: '#1e293b',
+      monthly_fee: 1200,
+      enrollment_fee: 400,
+      is_active: true,
+      created_at: '2024-01-15T08:00:00Z'
+    }
+  ],
+
+  /* ── Backward compat — páginas no migradas usan esto ─────────── */
+  categories: [],
+
+  /* ── Ejes de clasificación ────────────────────────────────────── */
+  axes: [
+    { id: 'axis_001', academy_id: 'acad_001', name: 'Cinta / Nivel', ordered: true,  created_at: '2024-01-15T08:00:00Z' },
+    { id: 'axis_002', academy_id: 'acad_001', name: 'Disciplina',    ordered: false, created_at: '2024-01-15T08:00:00Z' }
+  ],
+
+  /* ── Grupos (valores por eje) ─────────────────────────────────── */
+  groups: [
+    /* Cinta / Nivel (ordered) */
+    { id: 'grp_001', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Blanca',   order: 1, color: '#94a3b8', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_002', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Amarilla', order: 2, color: '#eab308', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_003', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Naranja',  order: 3, color: '#f97316', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_004', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Verde',    order: 4, color: '#22c55e', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_005', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Azul',     order: 5, color: '#3b82f6', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_006', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Roja',     order: 6, color: '#ef4444', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_007', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Café',     order: 7, color: '#92400e', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_008', axis_id: 'axis_001', academy_id: 'acad_001', name: 'Cinta Negra',    order: 8, color: '#1e293b', created_at: '2024-01-15T08:00:00Z' },
+    /* Disciplina (unordered) */
+    { id: 'grp_009', axis_id: 'axis_002', academy_id: 'acad_001', name: 'Karate',         order: 0, color: '#6366f1', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_010', axis_id: 'axis_002', academy_id: 'acad_001', name: 'Tae Kwon Do',    order: 0, color: '#8b5cf6', created_at: '2024-01-15T08:00:00Z' },
+    { id: 'grp_011', axis_id: 'axis_002', academy_id: 'acad_001', name: 'Judo',           order: 0, color: '#06b6d4', created_at: '2024-01-15T08:00:00Z' }
+  ],
 
   users: [
     {
@@ -40,8 +103,7 @@ window.MOCK_DB = {
       hourly_rate: null,
       payroll_type: null,
       email_verified_at: '2024-01-15T10:00:00Z',
-      created_at: '2024-01-15T08:00:00Z',
-      categories: []
+      created_at: '2024-01-15T08:00:00Z'
     },
     {
       id: 'user_002',
@@ -56,8 +118,7 @@ window.MOCK_DB = {
       hourly_rate: null,
       payroll_type: null,
       email_verified_at: '2024-01-20T10:00:00Z',
-      created_at: '2024-01-20T08:00:00Z',
-      categories: []
+      created_at: '2024-01-20T08:00:00Z'
     },
     {
       id: 'user_003',
@@ -71,9 +132,11 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: 280,
       payroll_type: 'hourly',
+      specialty: 'Karate, Judo',
+      credentials: 'Cinta Negra 4to Dan · 15 años de experiencia',
+      start_date: '2024-01-25',
       email_verified_at: '2024-01-25T10:00:00Z',
-      created_at: '2024-01-25T08:00:00Z',
-      categories: []
+      created_at: '2024-01-25T08:00:00Z'
     },
     {
       id: 'user_004',
@@ -87,9 +150,11 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: 320,
       payroll_type: 'hourly',
+      specialty: 'Tae Kwon Do, Judo',
+      credentials: 'Cinta Negra 3er Dan · Instructor certificado WTF · Juez Nacional',
+      start_date: '2024-01-26',
       email_verified_at: '2024-01-26T10:00:00Z',
-      created_at: '2024-01-26T08:00:00Z',
-      categories: []
+      created_at: '2024-01-26T08:00:00Z'
     },
     {
       id: 'user_005',
@@ -103,9 +168,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_001',
+      groups: ['grp_001', 'grp_009'],
+      payment_method: 'transfer',
+      start_date: '2024-02-01',
       email_verified_at: '2024-02-01T10:00:00Z',
-      created_at: '2024-02-01T08:00:00Z',
-      categories: ['cat_001']
+      created_at: '2024-02-01T08:00:00Z'
     },
     {
       id: 'user_006',
@@ -119,9 +187,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_002',
+      groups: ['grp_003', 'grp_010'],
+      payment_method: 'stripe',
+      start_date: '2024-02-05',
       email_verified_at: '2024-02-05T10:00:00Z',
-      created_at: '2024-02-05T08:00:00Z',
-      categories: ['cat_002']
+      created_at: '2024-02-05T08:00:00Z'
     },
     {
       id: 'user_007',
@@ -135,9 +206,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_003',
+      groups: ['grp_005', 'grp_010'],
+      payment_method: 'cash',
+      start_date: '2024-02-10',
       email_verified_at: '2024-02-10T10:00:00Z',
-      created_at: '2024-02-10T08:00:00Z',
-      categories: ['cat_003']
+      created_at: '2024-02-10T08:00:00Z'
     },
     {
       id: 'user_008',
@@ -151,9 +225,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_001',
+      groups: ['grp_002', 'grp_009'],
+      payment_method: 'cash',
+      start_date: '2024-02-12',
       email_verified_at: '2024-02-12T10:00:00Z',
-      created_at: '2024-02-12T08:00:00Z',
-      categories: ['cat_001']
+      created_at: '2024-02-12T08:00:00Z'
     },
     {
       id: 'user_009',
@@ -167,9 +244,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_002',
+      groups: ['grp_004', 'grp_009'],
+      payment_method: 'transfer',
+      start_date: '2024-02-15',
       email_verified_at: '2024-02-15T10:00:00Z',
-      created_at: '2024-02-15T08:00:00Z',
-      categories: ['cat_002']
+      created_at: '2024-02-15T08:00:00Z'
     },
     {
       id: 'user_010',
@@ -183,9 +263,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_001',
+      groups: ['grp_001', 'grp_011'],
+      payment_method: 'cash',
+      start_date: '2024-03-01',
       email_verified_at: '2024-03-01T10:00:00Z',
-      created_at: '2024-03-01T08:00:00Z',
-      categories: ['cat_001']
+      created_at: '2024-03-01T08:00:00Z'
     },
     {
       id: 'user_011',
@@ -199,9 +282,12 @@ window.MOCK_DB = {
       is_active: true,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_003',
+      groups: ['grp_006', 'grp_010'],
+      payment_method: 'transfer',
+      start_date: '2024-03-05',
       email_verified_at: '2024-03-05T10:00:00Z',
-      created_at: '2024-03-05T08:00:00Z',
-      categories: ['cat_003']
+      created_at: '2024-03-05T08:00:00Z'
     },
     {
       id: 'user_012',
@@ -215,42 +301,12 @@ window.MOCK_DB = {
       is_active: false,
       hourly_rate: null,
       payroll_type: null,
+      plan_id: 'plan_001',
+      groups: ['grp_001', 'grp_011'],
+      payment_method: null,
+      start_date: '2024-03-10',
       email_verified_at: '2024-03-10T10:00:00Z',
-      created_at: '2024-03-10T08:00:00Z',
-      categories: ['cat_001']
-    }
-  ],
-
-  categories: [
-    {
-      id: 'cat_001',
-      academy_id: 'acad_001',
-      name: 'Básico',
-      description: 'Acceso a clases de nivel básico de una disciplina a elección',
-      color: '#6366f1',
-      monthly_fee: 500,
-      enrollment_fee: 200,
-      created_at: '2024-01-15T08:00:00Z'
-    },
-    {
-      id: 'cat_002',
-      academy_id: 'acad_001',
-      name: 'Intermedio',
-      description: 'Acceso a clases básicas e intermedias de todas las disciplinas',
-      color: '#8b5cf6',
-      monthly_fee: 800,
-      enrollment_fee: 300,
-      created_at: '2024-01-15T08:00:00Z'
-    },
-    {
-      id: 'cat_003',
-      academy_id: 'acad_001',
-      name: 'Premium',
-      description: 'Acceso ilimitado a todas las clases y prioridad en lista de espera',
-      color: '#06b6d4',
-      monthly_fee: 1200,
-      enrollment_fee: 400,
-      created_at: '2024-01-15T08:00:00Z'
+      created_at: '2024-03-10T08:00:00Z'
     }
   ],
 
@@ -258,180 +314,295 @@ window.MOCK_DB = {
     {
       id: 'class_001',
       academy_id: 'acad_001',
-      name: 'Ballet Clásico',
-      description: 'Técnica clásica de ballet para principiantes y nivel básico. Énfasis en postura, flexibilidad y coordinación.',
+      name: 'Karate Principiante',
+      description: 'Fundamentos del Karate-Do: postura, kihon, kata Heian Shodan y etiqueta del dojo. Abierto a todos desde cinta blanca.',
       instructor_id: 'user_003',
       status: 'active',
       recurrence: 'weekly',
       schedule_day: 'monday',
-      schedule_time: '10:00',
+      schedule_time: '17:00',
+      schedule: [{ day: 'monday', time: '17:00' }, { day: 'wednesday', time: '17:00' }, { day: 'friday', time: '17:00' }],
       duration_minutes: 60,
-      max_students: 12,
-      price: 650,
-      location: 'Salón A',
+      max_students: 15,
+      price: 550,
+      location: 'Dojo A',
+      plan_ids: ['plan_001', 'plan_002', 'plan_003'],
+      min_group: null,
+      groups: ['grp_001', 'grp_002', 'grp_009'],
       start_date: '2024-02-05',
       end_date: null,
-      categories: ['cat_001', 'cat_002', 'cat_003'],
       created_at: '2024-01-20T08:00:00Z'
     },
     {
       id: 'class_002',
       academy_id: 'acad_001',
-      name: 'Piano Iniciación',
-      description: 'Aprende los fundamentos del piano: lectura de notas, postura y piezas básicas del repertorio clásico.',
+      name: 'Karate Intermedio',
+      description: 'Kata Heian 3-5 y kumite básico. Combinaciones de bloqueo y ataque. Requiere cinta verde o superior.',
       instructor_id: 'user_003',
       status: 'active',
       recurrence: 'weekly',
-      schedule_day: 'wednesday',
-      schedule_time: '16:00',
-      duration_minutes: 45,
-      max_students: 8,
-      price: 720,
-      location: 'Aula Música 1',
-      start_date: '2024-02-07',
+      schedule_day: 'tuesday',
+      schedule_time: '18:00',
+      schedule: [{ day: 'tuesday', time: '18:00' }, { day: 'thursday', time: '18:00' }],
+      duration_minutes: 75,
+      max_students: 12,
+      price: 650,
+      location: 'Dojo A',
+      plan_ids: ['plan_002', 'plan_003'],
+      min_group: 'grp_004',
+      groups: ['grp_004', 'grp_005', 'grp_009'],
+      start_date: '2024-02-06',
       end_date: null,
-      categories: ['cat_001', 'cat_002', 'cat_003'],
       created_at: '2024-01-20T08:00:00Z'
     },
     {
       id: 'class_003',
       academy_id: 'acad_001',
-      name: 'Fútbol Kids (5-10 años)',
-      description: 'Desarrollo de habilidades motoras y trabajo en equipo a través del fútbol. Para niños de 5 a 10 años.',
-      instructor_id: 'user_004',
+      name: 'Karate Avanzado',
+      description: 'Kata avanzadas (Bassai Dai, Kanku), kumite libre y preparación para competencia. Exclusivo cinta roja en adelante.',
+      instructor_id: 'user_003',
       status: 'active',
       recurrence: 'weekly',
-      schedule_day: 'saturday',
-      schedule_time: '09:00',
+      schedule_day: 'monday',
+      schedule_time: '19:00',
+      schedule: [{ day: 'monday', time: '19:00' }, { day: 'wednesday', time: '19:00' }, { day: 'friday', time: '19:00' }],
       duration_minutes: 90,
-      max_students: 20,
-      price: 450,
-      location: 'Cancha exterior',
-      start_date: '2024-02-10',
+      max_students: 10,
+      price: 800,
+      location: 'Dojo A',
+      plan_ids: ['plan_003'],
+      min_group: 'grp_006',
+      groups: ['grp_006', 'grp_007', 'grp_008', 'grp_009'],
+      start_date: '2024-02-07',
       end_date: null,
-      categories: ['cat_001', 'cat_002', 'cat_003'],
-      created_at: '2024-01-22T08:00:00Z'
+      created_at: '2024-01-21T08:00:00Z'
     },
     {
       id: 'class_004',
       academy_id: 'acad_001',
-      name: 'Yoga Restaurativo',
-      description: 'Práctica suave enfocada en la recuperación muscular, la respiración y la reducción del estrés.',
-      instructor_id: 'user_003',
+      name: 'Tae Kwon Do Principiante',
+      description: 'Técnica base de TKD: patadas frontales, laterales, poomsae Taegeuk 1-2 y caídas. Sin prerrequisitos.',
+      instructor_id: 'user_004',
       status: 'active',
       recurrence: 'weekly',
-      schedule_day: 'friday',
-      schedule_time: '07:30',
+      schedule_day: 'monday',
+      schedule_time: '16:00',
+      schedule: [{ day: 'monday', time: '16:00' }, { day: 'wednesday', time: '16:00' }],
       duration_minutes: 60,
       max_students: 15,
-      price: 380,
-      location: 'Salón Zen',
-      start_date: '2024-02-09',
+      price: 550,
+      location: 'Dojo B',
+      plan_ids: ['plan_001', 'plan_002', 'plan_003'],
+      min_group: null,
+      groups: ['grp_001', 'grp_002', 'grp_010'],
+      start_date: '2024-02-05',
       end_date: null,
-      categories: ['cat_002', 'cat_003'],
       created_at: '2024-01-22T08:00:00Z'
     },
     {
       id: 'class_005',
       academy_id: 'acad_001',
-      name: 'Guitarra Intermedia',
-      description: 'Acordes avanzados, rasgado, punteo y repertorio popular. Requiere conocimientos básicos de guitarra.',
+      name: 'Tae Kwon Do Intermedio',
+      description: 'Poomsae Taegeuk 3-5, saltos, bandal chagi y combinaciones de patada. Requiere cinta naranja o superior.',
       instructor_id: 'user_004',
       status: 'active',
       recurrence: 'weekly',
       schedule_day: 'tuesday',
-      schedule_time: '18:00',
-      duration_minutes: 60,
-      max_students: 10,
-      price: 680,
-      location: 'Aula Música 2',
+      schedule_time: '17:00',
+      schedule: [{ day: 'tuesday', time: '17:00' }, { day: 'thursday', time: '17:00' }, { day: 'saturday', time: '10:00' }],
+      duration_minutes: 75,
+      max_students: 12,
+      price: 650,
+      location: 'Dojo B',
+      plan_ids: ['plan_002', 'plan_003'],
+      min_group: 'grp_003',
+      groups: ['grp_003', 'grp_004', 'grp_005', 'grp_010'],
       start_date: '2024-02-06',
       end_date: null,
-      categories: ['cat_002', 'cat_003'],
-      created_at: '2024-01-23T08:00:00Z'
+      created_at: '2024-01-22T08:00:00Z'
     },
     {
       id: 'class_006',
       academy_id: 'acad_001',
-      name: 'Tae Kwon Do',
-      description: 'Arte marcial coreana. Cinturón blanco hasta verde. Disciplina, concentración y defensa personal.',
+      name: 'Tae Kwon Do Avanzado',
+      description: 'Poomsae Koryo, sparring olímpico y estrategia de competencia. Cinta azul en adelante.',
       instructor_id: 'user_004',
       status: 'active',
       recurrence: 'weekly',
-      schedule_day: 'thursday',
-      schedule_time: '17:00',
-      duration_minutes: 75,
-      max_students: 18,
-      price: 520,
-      location: 'Dojo',
-      start_date: '2024-02-08',
+      schedule_day: 'tuesday',
+      schedule_time: '19:00',
+      schedule: [{ day: 'tuesday', time: '19:00' }, { day: 'thursday', time: '19:00' }],
+      duration_minutes: 90,
+      max_students: 8,
+      price: 800,
+      location: 'Dojo B',
+      plan_ids: ['plan_003'],
+      min_group: 'grp_005',
+      groups: ['grp_005', 'grp_006', 'grp_007', 'grp_010'],
+      start_date: '2024-02-07',
       end_date: null,
-      categories: ['cat_001', 'cat_002', 'cat_003'],
       created_at: '2024-01-23T08:00:00Z'
+    },
+    {
+      id: 'class_007',
+      academy_id: 'acad_001',
+      name: 'Judo Principiante',
+      description: 'Ukemi (técnicas de caída), posición de guardia y primeros nage-waza. Abierto a todos sin cinta previa.',
+      instructor_id: 'user_003',
+      status: 'active',
+      recurrence: 'weekly',
+      schedule_day: 'saturday',
+      schedule_time: '09:00',
+      schedule: [{ day: 'saturday', time: '09:00' }, { day: 'sunday', time: '09:00' }],
+      duration_minutes: 75,
+      max_students: 15,
+      price: 580,
+      location: 'Tatami',
+      plan_ids: ['plan_001', 'plan_002', 'plan_003'],
+      min_group: null,
+      groups: ['grp_001', 'grp_002', 'grp_011'],
+      start_date: '2024-02-10',
+      end_date: null,
+      created_at: '2024-01-23T08:00:00Z'
+    },
+    {
+      id: 'class_008',
+      academy_id: 'acad_001',
+      name: 'Judo Intermedio',
+      description: 'Ne-waza, osoto-gari, shiai y táctica de competencia. Para cinta naranja en adelante.',
+      instructor_id: 'user_004',
+      status: 'active',
+      recurrence: 'weekly',
+      schedule_day: 'tuesday',
+      schedule_time: '16:00',
+      schedule: [{ day: 'tuesday', time: '16:00' }, { day: 'thursday', time: '16:00' }],
+      duration_minutes: 75,
+      max_students: 12,
+      price: 650,
+      location: 'Tatami',
+      plan_ids: ['plan_002', 'plan_003'],
+      min_group: 'grp_003',
+      groups: ['grp_003', 'grp_004', 'grp_005', 'grp_011'],
+      start_date: '2024-02-12',
+      end_date: null,
+      created_at: '2024-01-24T08:00:00Z'
+    },
+    {
+      id: 'class_009',
+      academy_id: 'acad_001',
+      name: 'Karate Infantil',
+      description: 'Karate para niños de 5 a 12 años. Valores, disciplina, kihon básico y juegos marciales en ambiente divertido.',
+      instructor_id: 'user_003',
+      status: 'active',
+      recurrence: 'weekly',
+      schedule_day: 'saturday',
+      schedule_time: '11:00',
+      schedule: [{ day: 'saturday', time: '11:00' }, { day: 'sunday', time: '10:00' }],
+      duration_minutes: 60,
+      max_students: 20,
+      price: 450,
+      location: 'Dojo A',
+      plan_ids: ['plan_001', 'plan_002', 'plan_003'],
+      min_group: null,
+      groups: ['grp_001', 'grp_002', 'grp_009'],
+      start_date: '2024-02-10',
+      end_date: null,
+      created_at: '2024-01-24T08:00:00Z'
+    },
+    {
+      id: 'class_010',
+      academy_id: 'acad_001',
+      name: 'Kata y Competencia',
+      description: 'Preparación especializada para torneos nacionales. Kata libre, bunkai y estrategia competitiva. Exclusivo cinta roja en adelante.',
+      instructor_id: 'user_004',
+      status: 'draft',
+      recurrence: 'weekly',
+      schedule_day: 'friday',
+      schedule_time: '18:00',
+      schedule: [{ day: 'friday', time: '18:00' }],
+      duration_minutes: 90,
+      max_students: 10,
+      price: 700,
+      location: 'Dojo A',
+      plan_ids: ['plan_003'],
+      min_group: 'grp_006',
+      groups: ['grp_006', 'grp_007', 'grp_008', 'grp_009', 'grp_010'],
+      start_date: '2024-06-01',
+      end_date: null,
+      created_at: '2024-05-01T08:00:00Z'
     }
   ],
 
   enrollments: [
-    { id: 'enroll_001', student_id: 'user_005', class_id: 'class_001', status: 'active', enrolled_at: '2024-02-01T10:00:00Z', waiting_position: null },
-    { id: 'enroll_002', student_id: 'user_005', class_id: 'class_002', status: 'active', enrolled_at: '2024-02-01T10:00:00Z', waiting_position: null },
-    { id: 'enroll_003', student_id: 'user_006', class_id: 'class_001', status: 'active', enrolled_at: '2024-02-05T10:00:00Z', waiting_position: null },
-    { id: 'enroll_004', student_id: 'user_006', class_id: 'class_004', status: 'active', enrolled_at: '2024-02-05T10:00:00Z', waiting_position: null },
-    { id: 'enroll_005', student_id: 'user_006', class_id: 'class_005', status: 'active', enrolled_at: '2024-02-05T10:00:00Z', waiting_position: null },
-    { id: 'enroll_006', student_id: 'user_007', class_id: 'class_003', status: 'active', enrolled_at: '2024-02-10T10:00:00Z', waiting_position: null },
-    { id: 'enroll_007', student_id: 'user_007', class_id: 'class_005', status: 'active', enrolled_at: '2024-02-10T10:00:00Z', waiting_position: null },
-    { id: 'enroll_008', student_id: 'user_007', class_id: 'class_006', status: 'active', enrolled_at: '2024-02-10T10:00:00Z', waiting_position: null },
-    { id: 'enroll_009', student_id: 'user_008', class_id: 'class_001', status: 'active', enrolled_at: '2024-02-12T10:00:00Z', waiting_position: null },
-    { id: 'enroll_010', student_id: 'user_008', class_id: 'class_003', status: 'active', enrolled_at: '2024-02-12T10:00:00Z', waiting_position: null },
-    { id: 'enroll_011', student_id: 'user_009', class_id: 'class_004', status: 'active', enrolled_at: '2024-02-15T10:00:00Z', waiting_position: null },
-    { id: 'enroll_012', student_id: 'user_009', class_id: 'class_005', status: 'active', enrolled_at: '2024-02-15T10:00:00Z', waiting_position: null },
-    { id: 'enroll_013', student_id: 'user_010', class_id: 'class_001', status: 'active', enrolled_at: '2024-03-01T10:00:00Z', waiting_position: null },
-    { id: 'enroll_014', student_id: 'user_010', class_id: 'class_006', status: 'active', enrolled_at: '2024-03-01T10:00:00Z', waiting_position: null },
-    { id: 'enroll_015', student_id: 'user_011', class_id: 'class_003', status: 'active', enrolled_at: '2024-03-05T10:00:00Z', waiting_position: null },
-    { id: 'enroll_016', student_id: 'user_011', class_id: 'class_006', status: 'active', enrolled_at: '2024-03-05T10:00:00Z', waiting_position: null },
-    { id: 'enroll_017', student_id: 'user_011', class_id: 'class_005', status: 'waiting', enrolled_at: '2024-03-06T10:00:00Z', waiting_position: 1 },
-    { id: 'enroll_018', student_id: 'user_012', class_id: 'class_002', status: 'cancelled', enrolled_at: '2024-03-10T10:00:00Z', waiting_position: null }
+    /* Juan (Cinta Blanca, Karate, plan_001) */
+    { id: 'enroll_001', student_id: 'user_005', class_id: 'class_001', status: 'active',    enrolled_at: '2024-02-01T10:00:00Z', waiting_position: null },
+    { id: 'enroll_002', student_id: 'user_005', class_id: 'class_009', status: 'active',    enrolled_at: '2024-02-01T10:00:00Z', waiting_position: null },
+    /* Sofía (Cinta Naranja, TKD, plan_002) */
+    { id: 'enroll_003', student_id: 'user_006', class_id: 'class_004', status: 'active',    enrolled_at: '2024-02-05T10:00:00Z', waiting_position: null },
+    { id: 'enroll_004', student_id: 'user_006', class_id: 'class_005', status: 'active',    enrolled_at: '2024-02-05T10:00:00Z', waiting_position: null },
+    /* Diego (Cinta Azul, TKD, plan_003) */
+    { id: 'enroll_005', student_id: 'user_007', class_id: 'class_005', status: 'active',    enrolled_at: '2024-02-10T10:00:00Z', waiting_position: null },
+    { id: 'enroll_006', student_id: 'user_007', class_id: 'class_006', status: 'active',    enrolled_at: '2024-02-10T10:00:00Z', waiting_position: null },
+    /* Valeria (Cinta Amarilla, Karate, plan_001) */
+    { id: 'enroll_007', student_id: 'user_008', class_id: 'class_001', status: 'active',    enrolled_at: '2024-02-12T10:00:00Z', waiting_position: null },
+    { id: 'enroll_008', student_id: 'user_008', class_id: 'class_009', status: 'active',    enrolled_at: '2024-02-12T10:00:00Z', waiting_position: null },
+    /* Miguel (Cinta Verde, Karate, plan_002) */
+    { id: 'enroll_009', student_id: 'user_009', class_id: 'class_001', status: 'active',    enrolled_at: '2024-02-15T10:00:00Z', waiting_position: null },
+    { id: 'enroll_010', student_id: 'user_009', class_id: 'class_002', status: 'active',    enrolled_at: '2024-02-15T10:00:00Z', waiting_position: null },
+    /* Camila (Cinta Blanca, Judo, plan_001) */
+    { id: 'enroll_011', student_id: 'user_010', class_id: 'class_007', status: 'active',    enrolled_at: '2024-03-01T10:00:00Z', waiting_position: null },
+    { id: 'enroll_012', student_id: 'user_010', class_id: 'class_004', status: 'active',    enrolled_at: '2024-03-01T10:00:00Z', waiting_position: null },
+    /* Andrés (Cinta Roja, TKD, plan_003) */
+    { id: 'enroll_013', student_id: 'user_011', class_id: 'class_005', status: 'active',    enrolled_at: '2024-03-05T10:00:00Z', waiting_position: null },
+    { id: 'enroll_014', student_id: 'user_011', class_id: 'class_006', status: 'active',    enrolled_at: '2024-03-05T10:00:00Z', waiting_position: null },
+    { id: 'enroll_015', student_id: 'user_011', class_id: 'class_003', status: 'active',    enrolled_at: '2024-03-05T10:00:00Z', waiting_position: null },
+    { id: 'enroll_016', student_id: 'user_011', class_id: 'class_006', status: 'waiting',   enrolled_at: '2024-03-06T10:00:00Z', waiting_position: 1 },
+    /* Isabella (inactiva, Judo) */
+    { id: 'enroll_017', student_id: 'user_012', class_id: 'class_007', status: 'cancelled', enrolled_at: '2024-03-10T10:00:00Z', waiting_position: null }
   ],
 
   transactions: [
-    /* --- INGRESOS (inscripciones) --- */
-    { id: 'txn_001', type: 'income', category: 'enrollment', subcategory: 'Cuota de inscripción', amount: 200, status: 'succeeded', payment_method: 'cash', student_id: 'user_005', class_id: 'class_001', due_date: '2024-02-01', paid_at: '2024-02-01T10:00:00Z', notes: null, created_at: '2024-02-01T10:00:00Z' },
-    { id: 'txn_002', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 500, status: 'succeeded', payment_method: 'transfer', student_id: 'user_005', class_id: 'class_001', due_date: '2024-02-01', paid_at: '2024-02-01T10:00:00Z', notes: null, created_at: '2024-02-01T10:00:00Z' },
-    { id: 'txn_003', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 500, status: 'succeeded', payment_method: 'transfer', student_id: 'user_005', class_id: 'class_001', due_date: '2024-03-01', paid_at: '2024-03-02T11:00:00Z', notes: null, created_at: '2024-03-01T08:00:00Z' },
-    { id: 'txn_004', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 500, status: 'succeeded', payment_method: 'transfer', student_id: 'user_005', class_id: 'class_001', due_date: '2024-04-01', paid_at: '2024-04-01T09:00:00Z', notes: null, created_at: '2024-04-01T08:00:00Z' },
-    { id: 'txn_005', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 500, status: 'pending', payment_method: null, student_id: 'user_005', class_id: 'class_001', due_date: '2026-05-01', paid_at: null, notes: null, created_at: '2026-05-01T08:00:00Z' },
-    { id: 'txn_006', type: 'income', category: 'enrollment', subcategory: 'Cuota de inscripción', amount: 300, status: 'succeeded', payment_method: 'cash', student_id: 'user_006', class_id: 'class_004', due_date: '2024-02-05', paid_at: '2024-02-05T10:00:00Z', notes: null, created_at: '2024-02-05T10:00:00Z' },
-    { id: 'txn_007', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 800, status: 'succeeded', payment_method: 'stripe', student_id: 'user_006', class_id: null, due_date: '2024-03-01', paid_at: '2024-03-01T10:00:00Z', notes: 'Suscripción Intermedio', created_at: '2024-03-01T08:00:00Z' },
-    { id: 'txn_008', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 800, status: 'pending', payment_method: null, student_id: 'user_006', class_id: null, due_date: '2026-05-01', paid_at: null, notes: null, created_at: '2026-05-01T08:00:00Z' },
-    { id: 'txn_009', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 1200, status: 'succeeded', payment_method: 'stripe', student_id: 'user_007', class_id: null, due_date: '2024-04-01', paid_at: '2024-04-02T10:00:00Z', notes: null, created_at: '2024-04-01T08:00:00Z' },
-    { id: 'txn_010', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 1200, status: 'succeeded', payment_method: 'stripe', student_id: 'user_007', class_id: null, due_date: '2026-04-01', paid_at: '2026-04-01T10:00:00Z', notes: null, created_at: '2026-04-01T08:00:00Z' },
-    { id: 'txn_011', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 500, status: 'pending', payment_method: null, student_id: 'user_008', class_id: null, due_date: '2026-04-15', paid_at: null, notes: null, created_at: '2026-04-15T08:00:00Z' },
-    { id: 'txn_012', type: 'income', category: 'enrollment', subcategory: 'Mensualidad', amount: 800, status: 'failed',  payment_method: 'stripe', student_id: 'user_009', class_id: null, due_date: '2026-05-01', paid_at: null, notes: 'Tarjeta declinada', created_at: '2026-05-01T08:00:00Z' },
-    { id: 'txn_013', type: 'income', category: 'enrollment', subcategory: 'Uniforme', amount: 450, status: 'succeeded', payment_method: 'cash', student_id: 'user_010', class_id: null, due_date: '2024-03-05', paid_at: '2024-03-05T11:00:00Z', notes: 'Uniforme de ballet talla M', created_at: '2024-03-05T11:00:00Z' },
-    { id: 'txn_014', type: 'income', category: 'enrollment', subcategory: 'Material', amount: 220, status: 'succeeded', payment_method: 'cash', student_id: 'user_011', class_id: null, due_date: '2024-03-08', paid_at: '2024-03-08T10:00:00Z', notes: 'Cuaderno de partituras', created_at: '2024-03-08T10:00:00Z' },
+    /* --- INGRESOS --- */
+    { id: 'txn_001', type: 'income', category: 'enrollment', subcategory: 'Cuota de inscripción', amount: 200,  status: 'succeeded', payment_method: 'cash',     student_id: 'user_005', class_id: 'class_001', due_date: '2024-02-01', paid_at: '2024-02-01T10:00:00Z', notes: null,                        created_at: '2024-02-01T10:00:00Z' },
+    { id: 'txn_002', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 500,  status: 'succeeded', payment_method: 'transfer', student_id: 'user_005', class_id: 'class_001', due_date: '2024-02-01', paid_at: '2024-02-01T10:00:00Z', notes: null,                        created_at: '2024-02-01T10:00:00Z' },
+    { id: 'txn_003', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 500,  status: 'succeeded', payment_method: 'transfer', student_id: 'user_005', class_id: 'class_001', due_date: '2024-03-01', paid_at: '2024-03-02T11:00:00Z', notes: null,                        created_at: '2024-03-01T08:00:00Z' },
+    { id: 'txn_004', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 500,  status: 'succeeded', payment_method: 'transfer', student_id: 'user_005', class_id: 'class_001', due_date: '2024-04-01', paid_at: '2024-04-01T09:00:00Z', notes: null,                        created_at: '2024-04-01T08:00:00Z' },
+    { id: 'txn_005', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 500,  status: 'pending',   payment_method: null,       student_id: 'user_005', class_id: 'class_001', due_date: '2026-05-01', paid_at: null,                   notes: null,                        created_at: '2026-05-01T08:00:00Z' },
+    { id: 'txn_006', type: 'income', category: 'enrollment', subcategory: 'Cuota de inscripción', amount: 300,  status: 'succeeded', payment_method: 'cash',     student_id: 'user_006', class_id: 'class_004', due_date: '2024-02-05', paid_at: '2024-02-05T10:00:00Z', notes: null,                        created_at: '2024-02-05T10:00:00Z' },
+    { id: 'txn_007', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 800,  status: 'succeeded', payment_method: 'stripe',   student_id: 'user_006', class_id: null,        due_date: '2024-03-01', paid_at: '2024-03-01T10:00:00Z', notes: 'Plan Estándar',             created_at: '2024-03-01T08:00:00Z' },
+    { id: 'txn_008', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 800,  status: 'pending',   payment_method: null,       student_id: 'user_006', class_id: null,        due_date: '2026-05-01', paid_at: null,                   notes: null,                        created_at: '2026-05-01T08:00:00Z' },
+    { id: 'txn_009', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 1200, status: 'succeeded', payment_method: 'stripe',   student_id: 'user_007', class_id: null,        due_date: '2024-04-01', paid_at: '2024-04-02T10:00:00Z', notes: null,                        created_at: '2024-04-01T08:00:00Z' },
+    { id: 'txn_010', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 1200, status: 'succeeded', payment_method: 'stripe',   student_id: 'user_007', class_id: null,        due_date: '2026-04-01', paid_at: '2026-04-01T10:00:00Z', notes: null,                        created_at: '2026-04-01T08:00:00Z' },
+    { id: 'txn_011', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 500,  status: 'pending',   payment_method: null,       student_id: 'user_008', class_id: null,        due_date: '2026-04-15', paid_at: null,                   notes: null,                        created_at: '2026-04-15T08:00:00Z' },
+    { id: 'txn_012', type: 'income', category: 'enrollment', subcategory: 'Mensualidad',          amount: 800,  status: 'failed',    payment_method: 'stripe',   student_id: 'user_009', class_id: null,        due_date: '2026-05-01', paid_at: null,                   notes: 'Tarjeta declinada',         created_at: '2026-05-01T08:00:00Z' },
+    { id: 'txn_013', type: 'income', category: 'enrollment', subcategory: 'Uniforme',             amount: 450,  status: 'succeeded', payment_method: 'cash',     student_id: 'user_010', class_id: null,        due_date: '2024-03-05', paid_at: '2024-03-05T11:00:00Z', notes: 'Gi de Karate (uniforme) talla M', created_at: '2024-03-05T11:00:00Z' },
+    { id: 'txn_014', type: 'income', category: 'enrollment', subcategory: 'Material',             amount: 220,  status: 'succeeded', payment_method: 'cash',     student_id: 'user_011', class_id: null,        due_date: '2024-03-08', paid_at: '2024-03-08T10:00:00Z', notes: 'Protectores y espinilleras TKD',    created_at: '2024-03-08T10:00:00Z' },
     /* --- GASTOS --- */
-    { id: 'txn_015', type: 'expense', category: 'expense', subcategory: 'Renta', amount: 18000, status: 'succeeded', payment_method: 'transfer', student_id: null, class_id: null, due_date: '2026-05-01', paid_at: '2026-04-30T09:00:00Z', notes: 'Renta mayo 2026', created_at: '2026-04-30T09:00:00Z' },
-    { id: 'txn_016', type: 'expense', category: 'expense', subcategory: 'Servicios', amount: 2100, status: 'succeeded', payment_method: 'transfer', student_id: null, class_id: null, due_date: '2026-04-28', paid_at: '2026-04-28T10:00:00Z', notes: 'Electricidad y agua', created_at: '2026-04-28T10:00:00Z' },
-    { id: 'txn_017', type: 'expense', category: 'expense', subcategory: 'Marketing', amount: 3500, status: 'succeeded', payment_method: 'stripe', student_id: null, class_id: null, due_date: '2026-04-15', paid_at: '2026-04-15T10:00:00Z', notes: 'Facebook & Instagram Ads', created_at: '2026-04-15T10:00:00Z' },
-    { id: 'txn_018', type: 'expense', category: 'expense', subcategory: 'Equipamiento', amount: 8500, status: 'succeeded', payment_method: 'transfer', student_id: null, class_id: null, due_date: '2026-03-20', paid_at: '2026-03-20T09:00:00Z', notes: 'Espejo para Salón A', created_at: '2026-03-20T09:00:00Z' },
-    { id: 'txn_019', type: 'expense', category: 'expense', subcategory: 'Limpieza', amount: 1200, status: 'succeeded', payment_method: 'cash', student_id: null, class_id: null, due_date: '2026-04-30', paid_at: '2026-04-30T08:00:00Z', notes: 'Servicio de limpieza mensual', created_at: '2026-04-30T08:00:00Z' },
-    { id: 'txn_020', type: 'expense', category: 'expense', subcategory: 'Software', amount: 799, status: 'succeeded', payment_method: 'stripe', student_id: null, class_id: null, due_date: '2026-05-01', paid_at: '2026-05-01T08:00:00Z', notes: 'Suscripción mensual plataforma', created_at: '2026-05-01T08:00:00Z' },
+    { id: 'txn_015', type: 'expense', category: 'expense', subcategory: 'Renta',        amount: 18000, status: 'succeeded', payment_method: 'transfer', student_id: null, class_id: null, due_date: '2026-05-01', paid_at: '2026-04-30T09:00:00Z', notes: 'Renta mayo 2026',              created_at: '2026-04-30T09:00:00Z' },
+    { id: 'txn_016', type: 'expense', category: 'expense', subcategory: 'Servicios',    amount: 2100,  status: 'succeeded', payment_method: 'transfer', student_id: null, class_id: null, due_date: '2026-04-28', paid_at: '2026-04-28T10:00:00Z', notes: 'Electricidad y agua',          created_at: '2026-04-28T10:00:00Z' },
+    { id: 'txn_017', type: 'expense', category: 'expense', subcategory: 'Marketing',    amount: 3500,  status: 'succeeded', payment_method: 'stripe',   student_id: null, class_id: null, due_date: '2026-04-15', paid_at: '2026-04-15T10:00:00Z', notes: 'Facebook & Instagram Ads',     created_at: '2026-04-15T10:00:00Z' },
+    { id: 'txn_018', type: 'expense', category: 'expense', subcategory: 'Equipamiento', amount: 8500,  status: 'succeeded', payment_method: 'transfer', student_id: null, class_id: null, due_date: '2026-03-20', paid_at: '2026-03-20T09:00:00Z', notes: 'Espejos para Dojo A',          created_at: '2026-03-20T09:00:00Z' },
+    { id: 'txn_019', type: 'expense', category: 'expense', subcategory: 'Limpieza',     amount: 1200,  status: 'succeeded', payment_method: 'cash',     student_id: null, class_id: null, due_date: '2026-04-30', paid_at: '2026-04-30T08:00:00Z', notes: 'Servicio de limpieza mensual', created_at: '2026-04-30T08:00:00Z' },
+    { id: 'txn_020', type: 'expense', category: 'expense', subcategory: 'Software',     amount: 799,   status: 'succeeded', payment_method: 'stripe',   student_id: null, class_id: null, due_date: '2026-05-01', paid_at: '2026-05-01T08:00:00Z', notes: 'Suscripción mensual plataforma', created_at: '2026-05-01T08:00:00Z' },
     /* --- NÓMINA --- */
     { id: 'txn_021', type: 'expense', category: 'payroll', subcategory: 'Nómina instructora', amount: 11200, status: 'succeeded', payment_method: 'transfer', recipient_id: 'user_003', student_id: null, class_id: null, period_start: '2026-04-01', period_end: '2026-04-30', payroll_type: 'hourly', paid_at: '2026-05-02T10:00:00Z', notes: '40 hrs × $280', created_at: '2026-05-02T10:00:00Z' },
-    { id: 'txn_022', type: 'expense', category: 'payroll', subcategory: 'Nómina instructor', amount: 12800, status: 'succeeded', payment_method: 'transfer', recipient_id: 'user_004', student_id: null, class_id: null, period_start: '2026-04-01', period_end: '2026-04-30', payroll_type: 'hourly', paid_at: '2026-05-02T10:00:00Z', notes: '40 hrs × $320', created_at: '2026-05-02T10:00:00Z' },
-    { id: 'txn_023', type: 'expense', category: 'payroll', subcategory: 'Nómina instructora', amount: 0, status: 'pending', payment_method: null, recipient_id: 'user_003', student_id: null, class_id: null, period_start: '2026-05-01', period_end: '2026-05-31', payroll_type: 'hourly', paid_at: null, notes: null, created_at: '2026-05-01T08:00:00Z' },
-    { id: 'txn_024', type: 'expense', category: 'payroll', subcategory: 'Nómina instructor', amount: 0, status: 'pending', payment_method: null, recipient_id: 'user_004', student_id: null, class_id: null, period_start: '2026-05-01', period_end: '2026-05-31', payroll_type: 'hourly', paid_at: null, notes: null, created_at: '2026-05-01T08:00:00Z' }
+    { id: 'txn_022', type: 'expense', category: 'payroll', subcategory: 'Nómina instructor',  amount: 12800, status: 'succeeded', payment_method: 'transfer', recipient_id: 'user_004', student_id: null, class_id: null, period_start: '2026-04-01', period_end: '2026-04-30', payroll_type: 'hourly', paid_at: '2026-05-02T10:00:00Z', notes: '40 hrs × $320', created_at: '2026-05-02T10:00:00Z' },
+    { id: 'txn_023', type: 'expense', category: 'payroll', subcategory: 'Nómina instructora', amount: 0,     status: 'pending',   payment_method: null,       recipient_id: 'user_003', student_id: null, class_id: null, period_start: '2026-05-01', period_end: '2026-05-31', payroll_type: 'hourly', paid_at: null,                   notes: null,            created_at: '2026-05-01T08:00:00Z' },
+    { id: 'txn_024', type: 'expense', category: 'payroll', subcategory: 'Nómina instructor',  amount: 0,     status: 'pending',   payment_method: null,       recipient_id: 'user_004', student_id: null, class_id: null, period_start: '2026-05-01', period_end: '2026-05-31', payroll_type: 'hourly', paid_at: null,                   notes: null,            created_at: '2026-05-01T08:00:00Z' }
   ],
 
   attendance: (function() {
     const records = [];
     const today = new Date();
     const classSchedule = {
-      'class_001': { day: 1, students: ['user_005','user_006','user_008','user_010'] },
-      'class_002': { day: 3, students: ['user_005'] },
-      'class_003': { day: 6, students: ['user_007','user_008','user_010','user_011'] },
-      'class_004': { day: 5, students: ['user_006','user_009'] },
-      'class_005': { day: 2, students: ['user_006','user_007','user_009'] },
-      'class_006': { day: 4, students: ['user_007','user_010','user_011'] }
+      'class_001': { day: 1, students: ['user_005','user_008','user_009'] },           // Karate Principiante — Lunes
+      'class_002': { day: 2, students: ['user_009'] },                                 // Karate Intermedio — Martes
+      'class_003': { day: 1, students: ['user_011'] },                                 // Karate Avanzado — Lunes
+      'class_004': { day: 1, students: ['user_006','user_010'] },                      // TKD Principiante — Lunes
+      'class_005': { day: 2, students: ['user_006','user_007','user_011'] },           // TKD Intermedio — Martes
+      'class_006': { day: 2, students: ['user_007','user_011'] },                      // TKD Avanzado — Martes
+      'class_007': { day: 6, students: ['user_010'] },                                 // Judo Principiante — Sábado
+      'class_009': { day: 6, students: ['user_005','user_008'] }                       // Karate Infantil — Sábado
     };
     let id = 1;
     for (let w = 4; w >= 1; w--) {
@@ -459,116 +630,96 @@ window.MOCK_DB = {
   })(),
 
   invitations: [
-    {
-      id: 'inv_001',
-      academy_id: 'acad_001',
-      email: 'nuevo.instructor@mail.com',
-      role: 'instructor',
-      first_name: 'Carlos',
-      last_name: 'Vega',
-      invited_by: 'user_001',
-      token: 'tok_inv_abc123',
-      expires_at: '2026-06-05T00:00:00Z',
-      accepted_at: null,
-      created_at: '2026-05-06T10:00:00Z'
-    },
-    {
-      id: 'inv_002',
-      academy_id: 'acad_001',
-      email: 'nuevo.estudiante@mail.com',
-      role: 'student',
-      first_name: 'Fernanda',
-      last_name: 'Ruiz',
-      invited_by: 'user_001',
-      token: 'tok_inv_def456',
-      expires_at: '2026-06-05T00:00:00Z',
-      accepted_at: null,
-      created_at: '2026-05-06T11:00:00Z'
-    }
+    { id: 'inv_001', academy_id: 'acad_001', email: 'nuevo.instructor@mail.com', role: 'instructor', first_name: 'Carlos',   last_name: 'Vega',  invited_by: 'user_001', token: 'tok_inv_abc123', expires_at: '2026-06-05T00:00:00Z', accepted_at: null, created_at: '2026-05-06T10:00:00Z' },
+    { id: 'inv_002', academy_id: 'acad_001', email: 'nuevo.estudiante@mail.com', role: 'student',    first_name: 'Fernanda', last_name: 'Ruiz',  invited_by: 'user_001', token: 'tok_inv_def456', expires_at: '2026-06-05T00:00:00Z', accepted_at: null, created_at: '2026-05-06T11:00:00Z' }
   ],
 
-  /* Datos auxiliares */
   notifications_config: {
-    'user_001': { upcoming_payments: true, new_enrollments: true, attendance_reminders: true, waitlist_promotions: true },
-    'user_002': { upcoming_payments: true, new_enrollments: true, attendance_reminders: false, waitlist_promotions: false },
-    'user_003': { upcoming_payments: false, new_enrollments: true, attendance_reminders: true, waitlist_promotions: false },
-    'user_005': { upcoming_payments: true, new_enrollments: false, attendance_reminders: true, waitlist_promotions: true }
+    'user_001': { upcoming_payments: true,  new_enrollments: true,  attendance_reminders: true,  waitlist_promotions: true  },
+    'user_002': { upcoming_payments: true,  new_enrollments: true,  attendance_reminders: false, waitlist_promotions: false },
+    'user_003': { upcoming_payments: false, new_enrollments: true,  attendance_reminders: true,  waitlist_promotions: false },
+    'user_005': { upcoming_payments: true,  new_enrollments: false, attendance_reminders: true,  waitlist_promotions: true  }
   }
 };
 
 /* ================================================================
-   HELPERS para consultar MOCK_DB
+   HELPERS
    ================================================================ */
 
 window.DB = {
-  getUser: id => MOCK_DB.users.find(u => u.id === id),
-  getUserByEmail: email => MOCK_DB.users.find(u => u.email.toLowerCase() === email.toLowerCase()),
-  getStudents: () => MOCK_DB.users.filter(u => u.role === 'student'),
-  getInstructors: () => MOCK_DB.users.filter(u => u.role === 'instructor'),
-  getClass: id => MOCK_DB.classes.find(c => c.id === id),
-  getActiveClasses: () => MOCK_DB.classes.filter(c => c.status === 'active'),
-  getCategory: id => MOCK_DB.categories.find(c => c.id === id),
-  getEnrollmentsForStudent: studentId => MOCK_DB.enrollments.filter(e => e.student_id === studentId && e.status === 'active'),
-  getEnrollmentsForClass: classId => MOCK_DB.enrollments.filter(e => e.class_id === classId && e.status === 'active'),
-  getAttendanceForClass: (classId, date) => MOCK_DB.attendance.filter(a => a.class_id === classId && a.session_date === date),
-  getAttendanceForStudent: studentId => MOCK_DB.attendance.filter(a => a.user_id === studentId),
+  /* ── Usuarios ─────────────────────────────────────────────────── */
+  getUser:          id    => MOCK_DB.users.find(u => u.id === id),
+  getUserByEmail:   email => MOCK_DB.users.find(u => u.email.toLowerCase() === email.toLowerCase()),
+  getStudents:      ()    => MOCK_DB.users.filter(u => u.role === 'student'),
+  getInstructors:   ()    => MOCK_DB.users.filter(u => u.role === 'instructor'),
+
+  /* ── Clases ───────────────────────────────────────────────────── */
+  getClass:         id    => MOCK_DB.classes.find(c => c.id === id),
+  getActiveClasses: ()    => MOCK_DB.classes.filter(c => c.status === 'active'),
   getInstructorClasses: instructorId => MOCK_DB.classes.filter(c => c.instructor_id === instructorId && c.status === 'active'),
 
-  getStudentDebt: studentId => {
-    return MOCK_DB.transactions
-      .filter(t => t.student_id === studentId && t.type === 'income' && t.status === 'pending')
-      .reduce((sum, t) => sum + t.amount, 0);
+  /* ── Planes ───────────────────────────────────────────────────── */
+  getPlan:          id    => MOCK_DB.plans.find(p => p.id === id),
+  getActivePlans:   ()    => MOCK_DB.plans.filter(p => p.is_active),
+  getStudentsInPlan: planId => MOCK_DB.users.filter(u => u.role === 'student' && u.is_active && u.plan_id === planId),
+
+  /* ── Ejes y Grupos ────────────────────────────────────────────── */
+  getAxis:          id      => MOCK_DB.axes.find(a => a.id === id),
+  getGroup:         id      => MOCK_DB.groups.find(g => g.id === id),
+  getAxes:          ()      => MOCK_DB.axes,
+  getGroupsByAxis:  axisId  => MOCK_DB.groups.filter(g => g.axis_id === axisId).sort((a,b) => a.order - b.order),
+  getStudentGroups: userId  => {
+    const u = MOCK_DB.users.find(x => x.id === userId);
+    return (u?.groups || []).map(gid => MOCK_DB.groups.find(g => g.id === gid)).filter(Boolean);
   },
 
-  getTotalDebt: () => {
-    return MOCK_DB.transactions
-      .filter(t => t.type === 'income' && t.status === 'pending')
-      .reduce((sum, t) => sum + t.amount, 0);
+  /* ── Lógica de inscripción ────────────────────────────────────── */
+  checkEnrollAccess: (studentId, classId) => {
+    const student = MOCK_DB.users.find(u => u.id === studentId);
+    const cls     = MOCK_DB.classes.find(c => c.id === classId);
+    if (!student || !cls) return { allowed: false, reason: 'No encontrado' };
+
+    // 1. Verificar nivel mínimo requerido
+    if (cls.min_group) {
+      const required = MOCK_DB.groups.find(g => g.id === cls.min_group);
+      if (required) {
+        const studentGroupsOnAxis = (student.groups || [])
+          .map(gid => MOCK_DB.groups.find(g => g.id === gid))
+          .filter(g => g && g.axis_id === required.axis_id);
+        const studentOrder = studentGroupsOnAxis.length
+          ? Math.max(...studentGroupsOnAxis.map(g => g.order))
+          : 0;
+        if (studentOrder < required.order) {
+          return { allowed: false, level_block: true,
+            reason: `Esta clase requiere nivel ${required.name} o superior. Tu nivel actual no cumple el prerrequisito.` };
+        }
+      }
+    }
+
+    // 2. Verificar cobertura del plan
+    const inPlan = (cls.plan_ids || []).includes(student.plan_id);
+    if (!inPlan) {
+      const plan = MOCK_DB.plans.find(p => p.id === student.plan_id);
+      return { allowed: true, premium: true, price: cls.price,
+        reason: `Esta clase no está incluida en tu ${plan?.name || 'plan'}. Costo individual: $${cls.price}.` };
+    }
+
+    return { allowed: true, premium: false };
   },
 
-  getMonthlyRevenue: () => {
-    const now = new Date();
-    return MOCK_DB.transactions
-      .filter(t => t.type === 'income' && t.status === 'succeeded' && t.paid_at && new Date(t.paid_at).getMonth() === now.getMonth())
-      .reduce((sum, t) => sum + t.amount, 0);
-  },
-
-  getAttendanceRate: studentId => {
-    const records = MOCK_DB.attendance.filter(a => a.user_id === studentId);
-    if (!records.length) return 0;
-    const present = records.filter(a => a.status === 'present').length;
-    return Math.round((present / records.length) * 100);
-  },
-
-  getInstructorHours: (instructorId, periodStart, periodEnd) => {
-    const classIds = MOCK_DB.classes.filter(c => c.instructor_id === instructorId).map(c => c.id);
-    const records = MOCK_DB.attendance.filter(a =>
-      classIds.includes(a.class_id) &&
-      a.session_date >= periodStart &&
-      a.session_date <= periodEnd
-    );
-    const sessions = [...new Set(records.map(a => a.class_id + '_' + a.session_date))];
-    return sessions.reduce((sum, key) => {
-      const classId = key.split('_')[0];
-      const cls = MOCK_DB.classes.find(c => c.id === classId);
-      return sum + (cls ? cls.duration_minutes / 60 : 0);
-    }, 0);
-  },
-
-  addTransaction: (data) => {
-    const id = 'txn_' + String(MOCK_DB.transactions.length + 1).padStart(3, '0');
-    const txn = { id, ...data, created_at: new Date().toISOString() };
-    MOCK_DB.transactions.push(txn);
-    return txn;
-  },
+  /* ── Inscripciones ────────────────────────────────────────────── */
+  getEnrollmentsForStudent: studentId => MOCK_DB.enrollments.filter(e => e.student_id === studentId && e.status === 'active'),
+  getEnrollmentsForClass:   classId   => MOCK_DB.enrollments.filter(e => e.class_id === classId && e.status === 'active'),
 
   enrollStudent: (studentId, classId) => {
     const exists = MOCK_DB.enrollments.find(e => e.student_id === studentId && e.class_id === classId);
     if (exists) return exists;
-    const cls = MOCK_DB.classes.find(c => c.id === classId);
+    const cls      = MOCK_DB.classes.find(c => c.id === classId);
     const enrolled = MOCK_DB.enrollments.filter(e => e.class_id === classId && e.status === 'active').length;
-    const status = cls && cls.max_students && enrolled >= cls.max_students ? 'waiting' : 'active';
-    const waiting_position = status === 'waiting' ? MOCK_DB.enrollments.filter(e => e.class_id === classId && e.status === 'waiting').length + 1 : null;
+    const status   = cls && cls.max_students && enrolled >= cls.max_students ? 'waiting' : 'active';
+    const waiting_position = status === 'waiting'
+      ? MOCK_DB.enrollments.filter(e => e.class_id === classId && e.status === 'waiting').length + 1
+      : null;
     const id = 'enroll_' + String(MOCK_DB.enrollments.length + 1).padStart(3, '0');
     const enrollment = { id, student_id: studentId, class_id: classId, status, enrolled_at: new Date().toISOString(), waiting_position };
     MOCK_DB.enrollments.push(enrollment);
@@ -579,5 +730,53 @@ window.DB = {
     const e = MOCK_DB.enrollments.find(e => e.id === enrollmentId);
     if (e) { e.status = 'cancelled'; e.cancelled_at = new Date().toISOString(); }
     return e;
-  }
+  },
+
+  /* ── Asistencia ───────────────────────────────────────────────── */
+  getAttendanceForClass:   (classId, date) => MOCK_DB.attendance.filter(a => a.class_id === classId && a.session_date === date),
+  getAttendanceForStudent: studentId       => MOCK_DB.attendance.filter(a => a.user_id === studentId),
+
+  getAttendanceRate: studentId => {
+    const records = MOCK_DB.attendance.filter(a => a.user_id === studentId);
+    if (!records.length) return 0;
+    return Math.round(records.filter(a => a.status === 'present').length / records.length * 100);
+  },
+
+  /* ── Financiero ───────────────────────────────────────────────── */
+  getStudentDebt: studentId => MOCK_DB.transactions
+    .filter(t => t.student_id === studentId && t.type === 'income' && t.status === 'pending')
+    .reduce((s, t) => s + t.amount, 0),
+
+  getTotalDebt: () => MOCK_DB.transactions
+    .filter(t => t.type === 'income' && t.status === 'pending')
+    .reduce((s, t) => s + t.amount, 0),
+
+  getMonthlyRevenue: () => {
+    const now = new Date();
+    return MOCK_DB.transactions
+      .filter(t => t.type === 'income' && t.status === 'succeeded' && t.paid_at &&
+        new Date(t.paid_at).getMonth() === now.getMonth())
+      .reduce((s, t) => s + t.amount, 0);
+  },
+
+  getInstructorHours: (instructorId, periodStart, periodEnd) => {
+    const classIds = MOCK_DB.classes.filter(c => c.instructor_id === instructorId).map(c => c.id);
+    const records  = MOCK_DB.attendance.filter(a =>
+      classIds.includes(a.class_id) && a.session_date >= periodStart && a.session_date <= periodEnd);
+    const sessions = [...new Set(records.map(a => a.class_id + '_' + a.session_date))];
+    return sessions.reduce((sum, key) => {
+      const cls = MOCK_DB.classes.find(c => c.id === key.split('_')[0]);
+      return sum + (cls ? cls.duration_minutes / 60 : 0);
+    }, 0);
+  },
+
+  addTransaction: (data) => {
+    const id  = 'txn_' + String(MOCK_DB.transactions.length + 1).padStart(3, '0');
+    const txn = { id, ...data, created_at: new Date().toISOString() };
+    MOCK_DB.transactions.push(txn);
+    return txn;
+  },
+
+  /* keep for pages that haven't migrated yet */
+  getCategory: id => MOCK_DB.plans.find(p => p.id === id) || MOCK_DB.groups.find(g => g.id === id)
 };

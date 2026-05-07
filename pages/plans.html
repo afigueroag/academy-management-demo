@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planes — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Planes', 'plans');
+
+/* ── State ────────────────────────────────────────────────────────── */
+let editingPlanId = null;
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
+function studentsInPlan(planId) {
+  return MOCK_DB.users.filter(u => u.role === 'student' && u.plan_id === planId);
+}
+
+function monthlyRevenueForPlan(planId) {
+  const plan = DB.getPlan(planId);
+  if (!plan) return 0;
+  return studentsInPlan(planId).filter(s => s.status === 'active').length * plan.monthly_fee;
+}
+
+function classesCoveredByPlan(planId) {
+  return MOCK_DB.classes.filter(cls => (cls.plan_ids || []).includes(planId));
+}
+
+/* ── Render ───────────────────────────────────────────────────────── */
+function renderPage() {
+  const plans = MOCK_DB.plans;
+  const totalActive = plans.filter(p => p.is_active).length;
+  const totalStudents = MOCK_DB.users.filter(u => u.role === 'student' && u.status === 'active').length;
+  const totalMRR = plans.reduce((sum, p) => sum + monthlyRevenueForPlan(p.id), 0);
+
+  document.getElementById('app-main').innerHTML = `
+    <!-- Stats -->
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:var(--space-6)">
+      <div class="stat-card">
+        <div class="stat-label">Planes activos</div>
+        <div class="stat-value">${totalActive}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Estudiantes activos</div>
+        <div class="stat-value">${totalStudents}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Ingreso mensual estimado</div>
+        <div class="stat-value">${Utils.formatCurrency(totalMRR)}</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="page-toolbar" style="margin-bottom:var(--space-5)">
+      <div></div>
+      <button class="btn btn-primary" onclick="openNewPlanModal()">+ Nuevo plan</button>
+    </div>
+
+    <!-- Plan cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--space-5)">
+      ${plans.map(plan => renderPlanCard(plan)).join('')}
+    </div>
+
+    <!-- New/Edit plan modal -->
+    <div class="modal-backdrop" id="plan-modal">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title" id="plan-modal-title">Nuevo plan</h3>
+          <button class="modal-close" onclick="Utils.closeModal('plan-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nombre</label>
+            <input class="form-control" id="plan-name" placeholder="Ej. Plan Básico">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descripción</label>
+            <textarea class="form-control" id="plan-desc" rows="2" placeholder="¿Qué incluye este plan?"></textarea>
+          </div>
+          <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+            <div class="form-group">
+              <label class="form-label">Costo mensual</label>
+              <input class="form-control" id="plan-monthly" type="number" min="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Costo de inscripción</label>
+              <input class="form-control" id="plan-enroll" type="number" min="0" placeholder="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Color</label>
+            <div style="display:flex;gap:var(--space-2);flex-wrap:wrap" id="plan-color-picker">
+              ${['#10b981','#6366f1','#8b5cf6','#06b6d4','#f59e0b','#ef4444','#ec4899','#14b8a6'].map(c =>
+                `<button type="button" class="color-swatch" data-color="${c}" onclick="selectPlanColor('${c}')" style="width:28px;height:28px;border-radius:50%;background:${c};border:2px solid transparent;cursor:pointer;transition:transform .15s"></button>`
+              ).join('')}
+            </div>
+            <input type="hidden" id="plan-color" value="#10b981">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Clases incluidas</label>
+            <div id="plan-classes-list" style="display:flex;flex-direction:column;gap:var(--space-2);max-height:180px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius);padding:var(--space-3)">
+              ${MOCK_DB.classes.map(cls => `
+                <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-sm)">
+                  <input type="checkbox" class="plan-class-cb" value="${cls.id}">
+                  <span>${cls.name}</span>
+                  <span style="color:var(--color-text-muted);margin-left:auto">${cls.location || ''}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="Utils.closeModal('plan-modal')">Cancelar</button>
+          <button class="btn btn-primary" onclick="savePlan()">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archive confirm modal -->
+    <div class="modal-backdrop" id="archive-plan-modal">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Archivar plan</h3>
+          <button class="modal-close" onclick="Utils.closeModal('archive-plan-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>¿Archivar este plan? Los estudiantes actuales mantendrán su plan asignado, pero no se podrá asignar a nuevos estudiantes.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="Utils.closeModal('archive-plan-modal')">Cancelar</button>
+          <button class="btn btn-danger" id="archive-plan-confirm-btn">Archivar</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  Utils.initModals();
+}
+
+function renderPlanCard(plan) {
+  const students = studentsInPlan(plan.id);
+  const activeStudents = students.filter(s => s.status === 'active');
+  const mrr = monthlyRevenueForPlan(plan.id);
+  const covered = classesCoveredByPlan(plan.id);
+
+  return `
+    <div class="card" style="border-top:3px solid ${plan.color};opacity:${plan.is_active ? 1 : 0.55}">
+      <div class="card-header" style="border-bottom:none;padding-bottom:0">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3)">
+          <div>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <h3 style="margin:0;font-size:var(--font-size-lg)">${plan.name}</h3>
+              ${!plan.is_active ? '<span class="badge badge-gray">Archivado</span>' : ''}
+            </div>
+            <p style="margin:var(--space-1) 0 0;color:var(--color-text-muted);font-size:var(--font-size-sm)">${plan.description || ''}</p>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:var(--font-size-xl);font-weight:700;color:${plan.color}">${Utils.formatCurrency(plan.monthly_fee)}<span style="font-size:var(--font-size-sm);font-weight:400;color:var(--color-text-muted)">/mes</span></div>
+            ${plan.enrollment_fee ? `<div style="font-size:var(--font-size-xs);color:var(--color-text-muted)">Inscripción: ${Utils.formatCurrency(plan.enrollment_fee)}</div>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="card-body" style="padding-top:var(--space-4)">
+        <!-- Metrics row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4);text-align:center">
+          <div>
+            <div style="font-size:var(--font-size-xl);font-weight:600">${activeStudents.length}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-muted)">Estudiantes</div>
+          </div>
+          <div>
+            <div style="font-size:var(--font-size-xl);font-weight:600">${covered.length}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-muted)">Clases incluidas</div>
+          </div>
+          <div>
+            <div style="font-size:var(--font-size-xl);font-weight:600;color:${plan.color}">${Utils.formatCurrency(mrr)}</div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-muted)">Ingreso/mes</div>
+          </div>
+        </div>
+
+        <!-- Covered classes -->
+        ${covered.length > 0 ? `
+          <div style="margin-bottom:var(--space-4)">
+            <div style="font-size:var(--font-size-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:var(--space-2)">Clases incluidas</div>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--space-1)">
+              ${covered.map(cls => `<span class="chip">${cls.name}</span>`).join('')}
+            </div>
+          </div>
+        ` : `<p style="font-size:var(--font-size-sm);color:var(--color-text-muted);margin-bottom:var(--space-4)">Sin clases asignadas</p>`}
+
+        <!-- Students avatars preview -->
+        ${activeStudents.length > 0 ? `
+          <div style="margin-bottom:var(--space-4)">
+            <div style="font-size:var(--font-size-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:var(--space-2)">Estudiantes</div>
+            <div style="display:flex;gap:var(--space-1);flex-wrap:wrap">
+              ${activeStudents.slice(0,8).map(s => `<span title="${s.first_name} ${s.last_name}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--color-primary-light);color:var(--color-primary);font-size:11px;font-weight:600">${Utils.getInitials(s.first_name, s.last_name)}</span>`).join('')}
+              ${activeStudents.length > 8 ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--color-gray-100);color:var(--color-text-muted);font-size:11px">+${activeStudents.length - 8}</span>` : ''}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Actions -->
+        <div style="display:flex;gap:var(--space-2)">
+          <button class="btn btn-sm btn-secondary" onclick="openEditPlanModal('${plan.id}')">Editar</button>
+          ${plan.is_active
+            ? `<button class="btn btn-sm btn-ghost" style="color:var(--color-danger)" onclick="confirmArchivePlan('${plan.id}')">Archivar</button>`
+            : `<button class="btn btn-sm btn-ghost" onclick="restorePlan('${plan.id}')">Restaurar</button>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ── Modal logic ──────────────────────────────────────────────────── */
+function selectPlanColor(color) {
+  document.getElementById('plan-color').value = color;
+  document.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.style.border = sw.dataset.color === color ? `2px solid ${color}` : '2px solid transparent';
+    sw.style.transform = sw.dataset.color === color ? 'scale(1.2)' : 'scale(1)';
+  });
+}
+
+function openNewPlanModal() {
+  editingPlanId = null;
+  document.getElementById('plan-modal-title').textContent = 'Nuevo plan';
+  document.getElementById('plan-name').value = '';
+  document.getElementById('plan-desc').value = '';
+  document.getElementById('plan-monthly').value = '';
+  document.getElementById('plan-enroll').value = '';
+  document.getElementById('plan-color').value = '#10b981';
+  document.querySelectorAll('.plan-class-cb').forEach(cb => cb.checked = false);
+  selectPlanColor('#10b981');
+  Utils.openModal('plan-modal');
+}
+
+function openEditPlanModal(planId) {
+  editingPlanId = planId;
+  const plan = DB.getPlan(planId);
+  if (!plan) return;
+  document.getElementById('plan-modal-title').textContent = 'Editar plan';
+  document.getElementById('plan-name').value = plan.name;
+  document.getElementById('plan-desc').value = plan.description || '';
+  document.getElementById('plan-monthly').value = plan.monthly_fee;
+  document.getElementById('plan-enroll').value = plan.enrollment_fee || '';
+  document.getElementById('plan-color').value = plan.color;
+  const covered = classesCoveredByPlan(planId).map(c => c.id);
+  document.querySelectorAll('.plan-class-cb').forEach(cb => {
+    cb.checked = covered.includes(cb.value);
+  });
+  selectPlanColor(plan.color);
+  Utils.openModal('plan-modal');
+}
+
+function savePlan() {
+  const name = document.getElementById('plan-name').value.trim();
+  if (!name) { Utils.toast('Campo requerido', 'El nombre del plan es obligatorio.', 'warning'); return; }
+  const monthly = parseFloat(document.getElementById('plan-monthly').value) || 0;
+  const enroll = parseFloat(document.getElementById('plan-enroll').value) || 0;
+  const color = document.getElementById('plan-color').value;
+  const desc = document.getElementById('plan-desc').value.trim();
+  const selectedClasses = [...document.querySelectorAll('.plan-class-cb:checked')].map(cb => cb.value);
+
+  if (editingPlanId) {
+    const plan = DB.getPlan(editingPlanId);
+    if (plan) {
+      plan.name = name;
+      plan.description = desc;
+      plan.monthly_fee = monthly;
+      plan.enrollment_fee = enroll;
+      plan.color = color;
+      MOCK_DB.classes.forEach(cls => {
+        const ids = cls.plan_ids || [];
+        if (selectedClasses.includes(cls.id) && !ids.includes(editingPlanId)) ids.push(editingPlanId);
+        if (!selectedClasses.includes(cls.id)) cls.plan_ids = ids.filter(id => id !== editingPlanId);
+        else cls.plan_ids = ids;
+      });
+    }
+    Utils.toast('Plan actualizado', name, 'success');
+  } else {
+    const newId = 'plan_' + Date.now();
+    MOCK_DB.plans.push({ id: newId, academy_id: 'acad_001', name, description: desc, color, monthly_fee: monthly, enrollment_fee: enroll, is_active: true, created_at: new Date().toISOString() });
+    MOCK_DB.classes.forEach(cls => {
+      if (selectedClasses.includes(cls.id)) {
+        if (!cls.plan_ids) cls.plan_ids = [];
+        if (!cls.plan_ids.includes(newId)) cls.plan_ids.push(newId);
+      }
+    });
+    Utils.toast('Plan creado', name, 'success');
+  }
+
+  Utils.closeModal('plan-modal');
+  renderPage();
+}
+
+function confirmArchivePlan(planId) {
+  const btn = document.getElementById('archive-plan-confirm-btn');
+  btn.onclick = () => {
+    const plan = DB.getPlan(planId);
+    if (plan) plan.is_active = false;
+    Utils.closeModal('archive-plan-modal');
+    Utils.toast('Plan archivado', plan?.name || '', 'info');
+    renderPage();
+  };
+  Utils.openModal('archive-plan-modal');
+}
+
+function restorePlan(planId) {
+  const plan = DB.getPlan(planId);
+  if (plan) { plan.is_active = true; Utils.toast('Plan restaurado', plan.name, 'success'); renderPage(); }
+}
+
+renderPage();
+</script>
+</body>
+</html>

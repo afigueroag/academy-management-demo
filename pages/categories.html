@@ -20,7 +20,7 @@ Utils.renderAppLayout('Categorías', 'categories');
 let editingId = null;
 
 function getStudentsInCategory(catId) {
-  return MOCK_DB.users.filter(u => u.role === 'student' && u.is_active && u.categories.includes(catId)).length;
+  return MOCK_DB.users.filter(u => u.role === 'student' && u.is_active && (u.categories||[]).includes(catId)).length;
 }
 
 function getRevenueForCategory(catId) {
@@ -245,7 +245,7 @@ function deleteCategory(catId) {
     ${enrolled > 0 ? `<div class="alert alert-warning" style="margin-top:var(--space-3)">⚠️ ${enrolled} alumno${enrolled!==1?'s':''} tiene${enrolled!==1?'n':''} esta categoría asignada. Se les removerá la categoría.</div>` : ''}
   `;
   document.getElementById('del-confirm-btn').onclick = () => {
-    MOCK_DB.users.forEach(u => { u.categories = u.categories.filter(c => c !== catId); });
+    MOCK_DB.users.forEach(u => { if (u.categories) u.categories = u.categories.filter(c => c !== catId); });
     const idx = MOCK_DB.categories.findIndex(c => c.id === catId);
     if (idx !== -1) MOCK_DB.categories.splice(idx, 1);
     closeModal('del-modal');

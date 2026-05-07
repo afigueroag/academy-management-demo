@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gastos — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Gastos', 'expenses');
+
+const state = {
+  filterCat: '',
+  filterStatus: '',
+  search: '',
+  dateFrom: '',
+  dateTo: ''
+};
+
+const EXPENSE_CATS = ['Renta','Servicios','Marketing','Equipamiento','Limpieza','Software','Nómina','Otro'];
+const METHOD_LABEL = { cash:'💵 Efectivo', transfer:'🏦 Transferencia', card:'💳 Tarjeta', stripe:'💳 Stripe' };
+
+function filteredExpenses() {
+  let list = MOCK_DB.transactions.filter(t => t.type === 'expense');
+  if (state.filterCat) list = list.filter(t => t.subcategory === state.filterCat || t.category === state.filterCat.toLowerCase());
+  if (state.filterStatus) list = list.filter(t => t.status === state.filterStatus);
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    list = list.filter(t => {
+      const recipient = t.recipient_id ? DB.getUser(t.recipient_id) : null;
+      const concept = (t.description || t.subcategory || '').toLowerCase();
+      const notes = (t.notes || '').toLowerCase();
+      return concept.includes(q) || notes.includes(q) ||
+        (recipient && (`${recipient.first_name} ${recipient.last_name}`).toLowerCase().includes(q));
+    });
+  }
+  if (state.dateFrom) list = list.filter(t => new Date(t.created_at) >= new Date(state.dateFrom));
+  if (state.dateTo) list = list.filter(t => new Date(t.created_at) <= new Date(state.dateTo + 'T23:59:59'));
+  return list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function getMonthStats() {
+  const now = new Date();
+  const expenses = MOCK_DB.transactions.filter(t => {
+    const d = new Date(t.created_at);
+    return t.type === 'expense' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  return {
+    total:     expenses.filter(t => t.status === 'succeeded').reduce((s,t) => s+t.amount, 0),
+    payroll:   expenses.filter(t => t.category === 'payroll' && t.status === 'succeeded').reduce((s,t) => s+t.amount, 0),
+    operating: expenses.filter(t => t.category === 'expense' && t.status === 'succeeded').reduce((s,t) => s+t.amount, 0),
+    pending:   expenses.filter(t => t.status === 'pending').reduce((s,t) => s+t.amount, 0)
+  };
+}
+
+function getSubcats() {
+  return [...new Set(MOCK_DB.transactions.filter(t => t.type === 'expense' && t.subcategory).map(t => t.subcategory))];
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const stats = getMonthStats();
+  const subcats = getSubcats();
+
+  main.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-6)">
+      <div>
+        <h1 class="page-title">Gastos</h1>
+        <p style="color:var(--color-text-muted);margin-top:var(--space-1)">Control de egresos y nómina</p>
+      </div>
+      <button class="btn btn-primary" onclick="openNewExpenseModal()">+ Registrar gasto</button>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Total este mes</span><span style="font-size:1.5rem">💸</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.total)}</div>
+        <div class="scorecard-trend trend-down">egresos del mes</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Nómina</span><span style="font-size:1.5rem">🧑‍🏫</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.payroll)}</div>
+        <div class="scorecard-trend trend-down">instructores</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Operativo</span><span style="font-size:1.5rem">🏢</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.operating)}</div>
+        <div class="scorecard-trend trend-down">renta, servicios, etc.</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Pendiente</span><span style="font-size:1.5rem">⏳</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.pending)}</div>
+        <div class="scorecard-trend ${stats.pending>0?'trend-down':'trend-up'}">${stats.pending>0?'por pagar':'sin pendientes'}</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4);align-items:center">
+        <div class="search-input" style="flex:1;min-width:200px">
+          <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+          <input type="text" class="search-field" placeholder="Buscar por concepto, proveedor…" oninput="state.search=this.value;renderTable()" value="${state.search}">
+        </div>
+        <select class="input select" style="width:auto" onchange="state.filterCat=this.value;renderTable()">
+          <option value="">Todas las categorías</option>
+          ${subcats.map(c => `<option value="${c}" ${state.filterCat===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <select class="input select" style="width:auto" onchange="state.filterStatus=this.value;renderTable()">
+          <option value="">Todos los estados</option>
+          <option value="succeeded" ${state.filterStatus==='succeeded'?'selected':''}>Pagado</option>
+          <option value="pending" ${state.filterStatus==='pending'?'selected':''}>Pendiente</option>
+          <option value="failed" ${state.filterStatus==='failed'?'selected':''}>Fallido</option>
+          <option value="refunded" ${state.filterStatus==='refunded'?'selected':''}>Reembolsado</option>
+        </select>
+        <input type="date" class="input" style="width:auto" onchange="state.dateFrom=this.value;renderTable()" value="${state.dateFrom}" title="Desde">
+        <input type="date" class="input" style="width:auto" onchange="state.dateTo=this.value;renderTable()" value="${state.dateTo}" title="Hasta">
+      </div>
+      <div id="expenses-table-wrap"></div>
+    </div>
+
+    <!-- Modal: Registrar gasto -->
+    <div class="modal-backdrop" id="new-expense-modal" onclick="if(event.target===this)closeModal('new-expense-modal')">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+          <h3 class="modal-title">Registrar gasto</h3>
+          <button class="modal-close" onclick="closeModal('new-expense-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="label">Categoría</label>
+            <select id="ne-cat" class="input select">
+              ${EXPENSE_CATS.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="label">Concepto / Descripción</label>
+            <input type="text" id="ne-desc" class="input" placeholder="Ej: Renta mayo, Electricidad…">
+          </div>
+          <div class="form-group">
+            <label class="label">Proveedor / Beneficiario</label>
+            <input type="text" id="ne-vendor" class="input" placeholder="Nombre del proveedor (opcional)">
+          </div>
+          <div class="form-group">
+            <label class="label">Monto</label>
+            <input type="number" id="ne-amount" class="input" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label class="label">Método de pago</label>
+            <select id="ne-method" class="input select">
+              <option value="transfer">🏦 Transferencia</option>
+              <option value="cash">💵 Efectivo</option>
+              <option value="card">💳 Tarjeta</option>
+              <option value="stripe">💳 Stripe</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('new-expense-modal')">Cancelar</button>
+          <button class="btn btn-primary" onclick="processNewExpense()">Registrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Registrar pago de transacción -->
+    <div class="modal-backdrop" id="pay-txn-modal" onclick="if(event.target===this)closeModal('pay-txn-modal')">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Registrar pago</h3>
+          <button class="modal-close" onclick="closeModal('pay-txn-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom:var(--space-1);font-weight:600" id="pt-info"></p>
+          <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin-bottom:var(--space-4)" id="pt-person"></p>
+          <div class="form-group">
+            <label class="label">Método de pago</label>
+            <select id="pt-method" class="input select">
+              <option value="transfer">🏦 Transferencia</option>
+              <option value="cash">💵 Efectivo</option>
+              <option value="card">💳 Tarjeta</option>
+              <option value="stripe">💳 Stripe</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('pay-txn-modal')">Cancelar</button>
+          <button class="btn btn-primary" onclick="confirmPayTxn()">Confirmar pago</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Ver transacción -->
+    <div class="side-panel-backdrop" id="txn-backdrop" onclick="closePanel('txn-panel')"></div>
+    <div class="side-panel" id="txn-panel">
+      <div class="side-panel-header">
+        <h3 id="txn-panel-title">Gasto</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('txn-panel')">✕</button>
+      </div>
+      <div id="txn-panel-body" style="padding:var(--space-5)"></div>
+    </div>
+  `;
+
+  renderTable();
+}
+
+function renderTable() {
+  const list = filteredExpenses();
+  const wrap = document.getElementById('expenses-table-wrap');
+  if (!wrap) return;
+  if (!list.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Sin gastos</div><div class="empty-desc">No hay registros que coincidan con los filtros.</div></div>`;
+    return;
+  }
+  const statusLabel = { succeeded:'Pagado', pending:'Pendiente', failed:'Fallido', refunded:'Reembolsado' };
+  const statusClass = { succeeded:'badge-success', pending:'badge-warning', failed:'badge-danger', refunded:'badge-default' };
+  const catClass = { payroll:'badge-warning', expense:'badge-danger' };
+
+  wrap.innerHTML = `
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr>
+          <th>Fecha</th>
+          <th>Proveedor / Beneficiario</th>
+          <th>Concepto</th>
+          <th>Categoría</th>
+          <th>Método</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(t => {
+            const recipient = t.recipient_id ? DB.getUser(t.recipient_id) : null;
+            const catLabel = t.subcategory || (t.category === 'payroll' ? 'Nómina' : 'Gasto');
+            return `<tr>
+              <td style="white-space:nowrap;color:var(--color-text-muted);font-size:var(--text-sm)">${Utils.formatDate(t.created_at)}</td>
+              <td>
+                ${recipient ? `
+                  <div style="display:flex;align-items:center;gap:var(--space-2)">
+                    ${Utils.avatarHtml(recipient,28)}
+                    <span style="font-size:var(--text-sm)">${recipient.first_name} ${recipient.last_name}</span>
+                  </div>
+                ` : (t.notes ? `<span style="font-size:var(--text-sm);color:var(--color-text-muted)">${t.notes}</span>` : '<span style="color:var(--color-text-muted)">—</span>')}
+              </td>
+              <td style="font-size:var(--text-sm)">${t.description || t.subcategory || '—'}</td>
+              <td><span class="badge ${t.category==='payroll'?'badge-warning':'badge-default'}">${catLabel}</span></td>
+              <td style="font-size:var(--text-sm);white-space:nowrap">${METHOD_LABEL[t.payment_method] || '<span style="color:var(--color-text-muted)">—</span>'}</td>
+              <td style="font-weight:600;white-space:nowrap">${Utils.formatCurrency(t.amount)}</td>
+              <td><span class="badge ${statusClass[t.status]||'badge-default'}">${statusLabel[t.status]||t.status}</span></td>
+              <td>
+                <div class="actions">
+                  ${t.status==='pending' ? `<button class="btn btn-primary btn-xs" onclick="openPayTxnModal('${t.id}')">Registrar Pago</button>` : ''}
+                  <button class="btn btn-outline btn-xs" onclick="openTxnPanel('${t.id}')">Ver detalles</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:var(--space-3) 0">
+      ${list.length} registro${list.length!==1?'s':''} — Total: ${Utils.formatCurrency(list.filter(t=>t.status==='succeeded').reduce((s,t)=>s+t.amount,0))}
+    </div>
+  `;
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closePanel(id) {
+  document.getElementById(id).classList.remove('open');
+  const bd = id.replace('-panel','-backdrop');
+  const el = document.getElementById(bd);
+  if (el) el.classList.remove('open');
+}
+
+function openNewExpenseModal() { openModal('new-expense-modal'); }
+
+function processNewExpense() {
+  const cat = document.getElementById('ne-cat').value;
+  const desc = document.getElementById('ne-desc').value.trim();
+  const vendor = document.getElementById('ne-vendor').value.trim();
+  const amount = parseFloat(document.getElementById('ne-amount').value);
+  const method = document.getElementById('ne-method').value;
+  if (!desc) { Utils.toast('Error', 'Ingresa un concepto', 'error'); return; }
+  if (!amount || amount <= 0) { Utils.toast('Error', 'Monto inválido', 'error'); return; }
+  DB.addTransaction({
+    type: 'expense', category: cat === 'Nómina' ? 'payroll' : 'expense',
+    subcategory: cat, description: desc,
+    notes: vendor || null, amount, status: 'succeeded',
+    payment_method: method, created_at: new Date().toISOString()
+  });
+  closeModal('new-expense-modal');
+  Utils.toast('Gasto registrado', `${Utils.formatCurrency(amount)} — ${cat}`, 'success');
+  renderTable();
+}
+
+function openPayTxnModal(txnId) {
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (!t) return;
+  const recipient = t.recipient_id ? DB.getUser(t.recipient_id) : null;
+  document.getElementById('pt-info').textContent = `${t.description || t.subcategory || 'Pago'} · ${Utils.formatCurrency(t.amount)}`;
+  document.getElementById('pt-person').textContent = recipient ? `${recipient.first_name} ${recipient.last_name}` : (t.notes || '');
+  document.getElementById('pt-method').value = t.payment_method || 'transfer';
+  document.getElementById('pay-txn-modal')._txnId = txnId;
+  openModal('pay-txn-modal');
+}
+
+function confirmPayTxn() {
+  const modal = document.getElementById('pay-txn-modal');
+  const txnId = modal._txnId;
+  const method = document.getElementById('pt-method').value;
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (!t) return;
+  t.status = 'succeeded';
+  t.payment_method = method;
+  t.paid_at = new Date().toISOString();
+  closeModal('pay-txn-modal');
+  Utils.toast('Pago registrado', `${Utils.formatCurrency(t.amount)} confirmado`, 'success');
+  renderTable();
+}
+
+function openTxnPanel(txnId) {
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (!t) return;
+  const recipient = t.recipient_id ? DB.getUser(t.recipient_id) : null;
+  const statusLabel = { succeeded:'Pagado', pending:'Pendiente', failed:'Fallido', refunded:'Reembolsado' };
+  const statusClass = { succeeded:'badge-success', pending:'badge-warning', failed:'badge-danger', refunded:'badge-default' };
+  document.getElementById('txn-panel-title').textContent = 'Gasto #' + t.id;
+  document.getElementById('txn-panel-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Estado</span>
+        <span class="badge ${statusClass[t.status]||'badge-default'}">${statusLabel[t.status]||t.status}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Monto</span>
+        <strong style="font-size:var(--text-xl)">${Utils.formatCurrency(t.amount)}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Concepto</span>
+        <span>${t.description || t.subcategory || '—'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Categoría</span>
+        <span class="badge ${t.category==='payroll'?'badge-warning':'badge-default'}">${t.subcategory || '—'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Fecha</span>
+        <span>${Utils.formatDate(t.created_at)}</span>
+      </div>
+      ${recipient ? `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--color-text-muted)">Beneficiario</span>
+        <div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(recipient,24)}<span>${recipient.first_name} ${recipient.last_name}</span></div>
+      </div>` : (t.notes ? `
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Referencia</span>
+        <span>${t.notes}</span>
+      </div>` : '')}
+      ${t.payment_method ? `
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Método</span>
+        <span>${METHOD_LABEL[t.payment_method] || t.payment_method}</span>
+      </div>` : ''}
+      ${t.period_start ? `
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Período</span>
+        <span>${Utils.formatDate(t.period_start)} — ${Utils.formatDate(t.period_end)}</span>
+      </div>` : ''}
+    </div>
+    <div style="margin-top:var(--space-6);display:flex;flex-direction:column;gap:var(--space-3)">
+      ${t.status === 'pending' ? `<button class="btn btn-primary" onclick="closePanel('txn-panel');openPayTxnModal('${t.id}')">Registrar Pago</button>` : ''}
+      ${t.status === 'succeeded' ? `<button class="btn btn-danger" onclick="refundTxn('${t.id}');closePanel('txn-panel')">Registrar reembolso</button>` : ''}
+    </div>
+  `;
+  document.getElementById('txn-backdrop').classList.add('open');
+  document.getElementById('txn-panel').classList.add('open');
+}
+
+function refundTxn(txnId) {
+  if (!confirm('¿Confirmar reembolso de esta transacción?')) return;
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (t) { t.status = 'refunded'; }
+  Utils.toast('Reembolso procesado', 'La transacción ha sido reembolsada', 'warning');
+  renderTable();
+}
+
+renderPage();
+</script>
+</body>
+</html>

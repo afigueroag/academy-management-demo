@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comunicados — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireRole(['admin','receptionist']);
+Utils.renderAppLayout('Comunicados', 'communications');
+
+/* ── Local comunicados store (simulated) ─────────────────────────── */
+const COMUNICADOS = [
+  {
+    id: 'c001', type: 'event',
+    subject: 'Festival de Fin de Año',
+    message: 'Nos complace invitarlos a nuestro festival de fin de año el sábado 14 de diciembre a las 18:00 hrs en las instalaciones de la academia. Habrá presentaciones de todas las disciplinas: ballet, guitarra, fútbol, yoga y tae kwon do. ¡Los esperamos!',
+    recipients: 'all', recipientCount: 12,
+    sentAt: '2025-12-01T10:00:00Z', sentBy: 'user_001'
+  },
+  {
+    id: 'c002', type: 'closure',
+    subject: 'Cierre por vacaciones decembrinas',
+    message: 'Les informamos que la academia estará cerrada del 23 de diciembre al 6 de enero. Las clases se reanudan el lunes 7 de enero. ¡Felices fiestas!',
+    recipients: 'all', recipientCount: 12,
+    sentAt: '2025-11-28T09:00:00Z', sentBy: 'user_001'
+  },
+  {
+    id: 'c003', type: 'reminder',
+    subject: 'Recordatorio de pago — Noviembre 2025',
+    message: 'Estimado alumno, te recordamos que tienes un pago pendiente correspondiente al mes de noviembre. Por favor regulariza tu situación a la brevedad en la recepción o vía transferencia.',
+    recipients: 'debtors', recipientCount: 3,
+    sentAt: '2025-11-05T08:00:00Z', sentBy: 'user_002'
+  },
+  {
+    id: 'c004', type: 'general',
+    subject: '¡Celebramos nuestro 5° aniversario!',
+    message: 'Con gran orgullo celebramos 5 años de arte y movimiento. Durante todo el mes de febrero habrá actividades especiales, clases de muestra gratuitas y descuentos en inscripciones para nuevos alumnos.',
+    recipients: 'all', recipientCount: 12,
+    sentAt: '2026-02-14T09:00:00Z', sentBy: 'user_001'
+  },
+  {
+    id: 'c005', type: 'reminder',
+    subject: 'Recordatorio de pago — Abril 2026',
+    message: 'Estimado alumno, te recordamos que tienes un pago pendiente correspondiente al mes de abril. Por favor acércate a la recepción para regularizar tu situación.',
+    recipients: 'debtors', recipientCount: 4,
+    sentAt: '2026-04-08T08:00:00Z', sentBy: 'user_002'
+  },
+  {
+    id: 'c006', type: 'general',
+    subject: 'Día de asueto — Lunes 19 de mayo',
+    message: 'Les comunicamos que este lunes 19 de mayo no habrá clases por día festivo. Las actividades se reanudan el martes 20. Gracias por su comprensión.',
+    recipients: 'all', recipientCount: 12,
+    sentAt: '2026-05-15T10:00:00Z', sentBy: 'user_002'
+  }
+];
+
+const TYPE_META = {
+  general:  { label: 'Aviso general',        badge: 'badge-primary',  emoji: '📢' },
+  event:    { label: 'Evento especial',       badge: 'badge-success',  emoji: '🎉' },
+  closure:  { label: 'Cierre temporal',       badge: 'badge-danger',   emoji: '🚫' },
+  reminder: { label: 'Recordatorio de pago',  badge: 'badge-warning',  emoji: '💳' },
+  other:    { label: 'Otro',                  badge: 'badge-default',  emoji: '📝' },
+};
+
+let filterType = 'all';
+
+/* ── Stats ──────────────────────────────────────────────────────── */
+function getStats() {
+  const pendingDebtors = new Set(
+    MOCK_DB.transactions.filter(t => t.status === 'pending' && t.type === 'income' && t.student_id).map(t => t.student_id)
+  );
+  return {
+    total:     COMUNICADOS.length,
+    notices:   COMUNICADOS.filter(c => c.type !== 'reminder').length,
+    reminders: COMUNICADOS.filter(c => c.type === 'reminder').length,
+    debtors:   pendingDebtors.size
+  };
+}
+
+/* ── Pending payments ───────────────────────────────────────────── */
+function getPendingByStudent() {
+  const byStudent = {};
+  MOCK_DB.transactions
+    .filter(t => t.status === 'pending' && t.type === 'income' && t.student_id)
+    .forEach(t => {
+      if (!byStudent[t.student_id]) byStudent[t.student_id] = [];
+      byStudent[t.student_id].push(t);
+    });
+  return Object.entries(byStudent)
+    .map(([sid, txns]) => ({ student: DB.getUser(sid), transactions: txns, total: txns.reduce((s,t) => s+t.amount, 0) }))
+    .filter(x => x.student);
+}
+
+/* ── Render page ────────────────────────────────────────────────── */
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const stats = getStats();
+
+  main.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-6)">
+      <div>
+        <h1 class="page-title">Comunicados</h1>
+        <p style="color:var(--color-text-muted);margin-top:var(--space-1)">Avisos masivos y recordatorios de pago</p>
+      </div>
+      <button class="btn btn-primary" onclick="openComposePanel()">+ Nuevo comunicado</button>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Total enviados</span><span style="font-size:1.5rem">📨</span></div>
+        <div class="scorecard-value">${stats.total}</div>
+        <div class="scorecard-trend trend-up">comunicados</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Avisos y eventos</span><span style="font-size:1.5rem">📢</span></div>
+        <div class="scorecard-value">${stats.notices}</div>
+        <div class="scorecard-trend trend-up">notificaciones generales</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Recordatorios</span><span style="font-size:1.5rem">💳</span></div>
+        <div class="scorecard-value">${stats.reminders}</div>
+        <div class="scorecard-trend trend-up">de pago enviados</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Con deuda activa</span><span style="font-size:1.5rem">⚠️</span></div>
+        <div class="scorecard-value">${stats.debtors}</div>
+        <div class="scorecard-trend ${stats.debtors>0?'trend-down':'trend-up'}">${stats.debtors>0?'alumnos pendientes':'todos al corriente'}</div>
+      </div>
+    </div>
+
+    <div class="tabs" id="com-tabs">
+      <button class="tab active" data-tab="tab-comunicados">Comunicados enviados (${stats.total})</button>
+      <button class="tab" data-tab="tab-recordatorios">Recordatorios de pago (${stats.debtors})</button>
+    </div>
+
+    <div id="tab-comunicados" class="tab-content active">
+      <div class="toolbar" style="margin-bottom:var(--space-4)">
+        <div class="filter-chips" id="type-chips">
+          <button class="filter-chip active" onclick="setFilterType('all',this)">Todos</button>
+          <button class="filter-chip" onclick="setFilterType('general',this)">Avisos</button>
+          <button class="filter-chip" onclick="setFilterType('event',this)">Eventos</button>
+          <button class="filter-chip" onclick="setFilterType('closure',this)">Cierres</button>
+          <button class="filter-chip" onclick="setFilterType('reminder',this)">Recordatorios</button>
+        </div>
+      </div>
+      <div id="comunicados-list"></div>
+    </div>
+
+    <div id="tab-recordatorios" class="tab-content">
+      <div id="recordatorios-list"></div>
+    </div>
+
+    <!-- Panel: Redactar comunicado -->
+    <div class="side-panel-backdrop" id="compose-backdrop" onclick="closePanel('compose-panel')"></div>
+    <div class="side-panel" id="compose-panel" style="width:520px">
+      <div class="side-panel-header">
+        <h3>Nuevo comunicado</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('compose-panel')">✕</button>
+      </div>
+      <div style="padding:var(--space-5);overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:var(--space-4)">
+        <div class="form-group">
+          <label class="label">Tipo de comunicado</label>
+          <select id="cp-type" class="input select" onchange="onTypeChange()">
+            <option value="general">📢 Aviso general</option>
+            <option value="event">🎉 Evento especial</option>
+            <option value="closure">🚫 Cierre temporal</option>
+            <option value="reminder">💳 Recordatorio de pago</option>
+            <option value="other">📝 Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label">Destinatarios</label>
+          <select id="cp-recipients" class="input select" onchange="updateRecipientCount()">
+            <option value="all">Todos los alumnos activos</option>
+            <option value="debtors">Solo alumnos con deuda pendiente</option>
+            ${MOCK_DB.plans.filter(p=>p.is_active).map(p => `<option value="${p.id}">Plan: ${p.name}</option>`).join('')}
+          </select>
+          <div id="cp-recipient-count" style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-top:4px"></div>
+        </div>
+        <div class="form-group">
+          <label class="label">Asunto</label>
+          <input type="text" id="cp-subject" class="input" placeholder="Asunto del comunicado…">
+        </div>
+        <div class="form-group">
+          <label class="label">Mensaje</label>
+          <textarea id="cp-message" class="input" rows="8" style="resize:vertical" placeholder="Escribe aquí el contenido del comunicado…"></textarea>
+        </div>
+        <div id="cp-preview-info" class="alert alert-info" style="font-size:var(--font-size-sm);display:none">
+          <span class="alert-icon">ℹ️</span>
+          <div id="cp-preview-text"></div>
+        </div>
+      </div>
+      <div style="padding:var(--space-4) var(--space-5);border-top:1px solid var(--color-border);display:flex;justify-content:flex-end;gap:var(--space-3);flex-shrink:0">
+        <button class="btn btn-outline" onclick="closePanel('compose-panel')">Cancelar</button>
+        <button class="btn btn-primary" onclick="sendComunicado()">Enviar comunicado</button>
+      </div>
+    </div>
+
+    <!-- Panel: Ver comunicado -->
+    <div class="side-panel-backdrop" id="detail-backdrop" onclick="closePanel('detail-panel')"></div>
+    <div class="side-panel" id="detail-panel" style="width:480px">
+      <div class="side-panel-header">
+        <h3 id="detail-panel-title">Comunicado</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('detail-panel')">✕</button>
+      </div>
+      <div id="detail-panel-body" style="padding:var(--space-5);overflow-y:auto"></div>
+    </div>
+  `;
+
+  Utils.initTabs('com-tabs');
+  renderComunicados();
+  renderRecordatorios();
+  updateRecipientCount();
+}
+
+/* ── Render comunicados list ──────────────────────────────────────── */
+function setFilterType(type, el) {
+  filterType = type;
+  document.querySelectorAll('#type-chips .filter-chip').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderComunicados();
+}
+
+function renderComunicados() {
+  const el = document.getElementById('comunicados-list');
+  if (!el) return;
+  const list = filterType === 'all' ? COMUNICADOS : COMUNICADOS.filter(c => c.type === filterType);
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><h3>Sin comunicados</h3><p>No hay comunicados en esta categoría.</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+    ${list.map(c => {
+      const meta = TYPE_META[c.type] || TYPE_META.other;
+      const sender = DB.getUser(c.sentBy);
+      const recipLabel = c.recipients === 'all' ? 'Todos los alumnos' : c.recipients === 'debtors' ? 'Alumnos con deuda' : 'Por categoría';
+      return `
+      <div class="card" style="cursor:pointer;transition:box-shadow var(--transition)" onclick="openDetailPanel('${c.id}')" onmouseenter="this.style.boxShadow='var(--shadow-md)'" onmouseleave="this.style.boxShadow=''">
+        <div class="card-body">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3)">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+                <span class="badge ${meta.badge}">${meta.label}</span>
+                <span style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${Utils.formatDate(c.sentAt)}</span>
+              </div>
+              <h3 style="font-size:var(--font-size-base);margin-bottom:var(--space-2)">${c.subject}</h3>
+              <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${c.message}</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--color-border)">
+            <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-xs);color:var(--color-text-secondary)">
+              ${sender ? `${Utils.avatarHtml(sender,'xs')} <span>${sender.first_name} ${sender.last_name}</span>` : ''}
+            </div>
+            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">
+              <strong>${c.recipientCount}</strong> destinatario${c.recipientCount !== 1 ? 's' : ''} · ${recipLabel}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* ── Render recordatorios ─────────────────────────────────────────── */
+function renderRecordatorios() {
+  const el = document.getElementById('recordatorios-list');
+  if (!el) return;
+  const pending = getPendingByStudent();
+  if (!pending.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><h3>Sin pagos pendientes</h3><p>Todos los alumnos están al corriente con sus pagos.</p></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4);flex-wrap:wrap;gap:var(--space-3)">
+      <label style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-sm);cursor:pointer">
+        <input type="checkbox" id="select-all-cb" onchange="toggleAllReminders(this.checked)">
+        Seleccionar todos
+      </label>
+      <button class="btn btn-primary btn-sm" onclick="sendSelectedReminders()">Enviar recordatorio a seleccionados</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr>
+          <th style="width:40px"></th>
+          <th>Alumno</th>
+          <th>Clases / Concepto</th>
+          <th>Monto pendiente</th>
+          <th>Vencimiento</th>
+          <th style="text-align:right">Acciones</th>
+        </tr></thead>
+        <tbody>
+          ${pending.map(({ student, transactions, total }) => {
+            const cls = transactions[0].class_id ? DB.getClass(transactions[0].class_id) : null;
+            const dueDates = [...new Set(transactions.map(t => t.due_date).filter(Boolean))];
+            return `<tr>
+              <td><input type="checkbox" class="rem-cb" value="${student.id}"></td>
+              <td>
+                <div style="display:flex;align-items:center;gap:var(--space-2)">
+                  ${Utils.avatarHtml(student, 28)}
+                  <div>
+                    <div style="font-weight:600;font-size:var(--font-size-sm)">${student.first_name} ${student.last_name}</div>
+                    <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${student.email}</div>
+                  </div>
+                </div>
+              </td>
+              <td style="font-size:var(--font-size-sm)">${cls ? cls.name : (transactions.map(t=>t.description||t.subcategory||'—').join(', '))}
+                ${transactions.length > 1 ? `<span style="font-size:10px;color:var(--color-text-secondary)">(${transactions.length} cargos)</span>` : ''}
+              </td>
+              <td style="font-weight:600;color:var(--color-danger)">${Utils.formatCurrency(total)}</td>
+              <td style="font-size:var(--font-size-sm);color:var(--color-text-secondary)">${dueDates[0] || '—'}</td>
+              <td style="text-align:right">
+                <button class="btn btn-outline btn-xs" onclick="sendSingleReminder('${student.id}')">Enviar recordatorio</button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function toggleAllReminders(checked) {
+  document.querySelectorAll('.rem-cb').forEach(cb => cb.checked = checked);
+}
+
+/* ── Compose panel ────────────────────────────────────────────────── */
+function openComposePanel() {
+  document.getElementById('cp-type').value = 'general';
+  document.getElementById('cp-recipients').value = 'all';
+  document.getElementById('cp-subject').value = '';
+  document.getElementById('cp-message').value = '';
+  document.getElementById('cp-preview-info').style.display = 'none';
+  updateRecipientCount();
+  document.getElementById('compose-backdrop').classList.add('open');
+  document.getElementById('compose-panel').classList.add('open');
+}
+
+function onTypeChange() {
+  const type = document.getElementById('cp-type').value;
+  if (type === 'reminder') document.getElementById('cp-recipients').value = 'debtors';
+  updateRecipientCount();
+  const templates = {
+    general:  { subject: '', message: '' },
+    event:    { subject: 'Evento especial — ', message: 'Nos complace invitarlos a ' },
+    closure:  { subject: 'Aviso de cierre — ', message: 'Les informamos que la academia estará cerrada el ' },
+    reminder: { subject: `Recordatorio de pago — ${new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'})}`, message: 'Estimado alumno, te recordamos que tienes un pago pendiente. Por favor regulariza tu situación a la brevedad.' },
+    other:    { subject: '', message: '' },
+  };
+  const tpl = templates[type];
+  if (tpl && !document.getElementById('cp-subject').value) document.getElementById('cp-subject').value = tpl.subject;
+  if (tpl && !document.getElementById('cp-message').value) document.getElementById('cp-message').value = tpl.message;
+}
+
+function updateRecipientCount() {
+  const recipients = document.getElementById('cp-recipients')?.value;
+  if (!recipients) return;
+  let count = 0, label = '';
+  if (recipients === 'all') {
+    count = MOCK_DB.users.filter(u => u.role === 'student' && u.is_active).length;
+    label = `${count} alumnos activos`;
+  } else if (recipients === 'debtors') {
+    const ids = new Set(MOCK_DB.transactions.filter(t => t.status === 'pending' && t.type === 'income' && t.student_id).map(t => t.student_id));
+    count = ids.size;
+    label = `${count} alumnos con pago pendiente`;
+  } else {
+    count = MOCK_DB.users.filter(u => u.role === 'student' && u.is_active && u.plan_id === recipients).length;
+    const plan = DB.getPlan(recipients);
+    label = `${count} alumnos en plan "${plan?.name || recipients}"`;
+  }
+  const el = document.getElementById('cp-recipient-count');
+  if (el) el.textContent = `Se enviará a: ${label}`;
+  const infoEl = document.getElementById('cp-preview-info');
+  const textEl = document.getElementById('cp-preview-text');
+  if (infoEl && textEl) {
+    textEl.textContent = `Se enviará a ${label}.`;
+    infoEl.style.display = 'flex';
+  }
+  return count;
+}
+
+function sendComunicado() {
+  const type = document.getElementById('cp-type').value;
+  const recipients = document.getElementById('cp-recipients').value;
+  const subject = document.getElementById('cp-subject').value.trim();
+  const message = document.getElementById('cp-message').value.trim();
+  if (!subject) { Utils.toast('Error', 'El asunto es requerido', 'error'); return; }
+  if (!message) { Utils.toast('Error', 'El mensaje es requerido', 'error'); return; }
+
+  let recipientCount = 0;
+  let recipientLabel = '';
+  if (recipients === 'all') {
+    recipientCount = MOCK_DB.users.filter(u => u.role === 'student' && u.is_active).length;
+    recipientLabel = 'Todos los alumnos';
+  } else if (recipients === 'debtors') {
+    const ids = new Set(MOCK_DB.transactions.filter(t => t.status === 'pending' && t.type === 'income' && t.student_id).map(t => t.student_id));
+    recipientCount = ids.size;
+    recipientLabel = 'Alumnos con deuda';
+  } else {
+    recipientCount = MOCK_DB.users.filter(u => u.role === 'student' && u.is_active && u.plan_id === recipients).length;
+    const plan = DB.getPlan(recipients);
+    recipientLabel = `Plan: ${plan?.name || recipients}`;
+  }
+
+  const user = Auth.getCurrentUser();
+  COMUNICADOS.unshift({
+    id: 'c' + Date.now(), type, subject, message,
+    recipients, recipientCount,
+    sentAt: new Date().toISOString(), sentBy: user.id
+  });
+
+  closePanel('compose-panel');
+
+  if (type === 'reminder' && recipientCount === 1) {
+    const sid = [...new Set(MOCK_DB.transactions.filter(t => t.status === 'pending' && t.type === 'income' && t.student_id).map(t => t.student_id))][0];
+    const student = DB.getUser(sid);
+    if (student) showReminderEmail(student, subject, message);
+  } else {
+    Utils.toast('Comunicado enviado', `Enviado a ${recipientCount} alumno${recipientCount!==1?'s':''} — ${recipientLabel}`, 'success');
+  }
+
+  renderComunicados();
+  renderRecordatorios();
+}
+
+/* ── Detail panel ─────────────────────────────────────────────────── */
+function openDetailPanel(id) {
+  const c = COMUNICADOS.find(x => x.id === id);
+  if (!c) return;
+  const meta = TYPE_META[c.type] || TYPE_META.other;
+  const sender = DB.getUser(c.sentBy);
+  const recipLabel = c.recipients === 'all' ? 'Todos los alumnos' : c.recipients === 'debtors' ? 'Alumnos con deuda' : 'Por categoría';
+  document.getElementById('detail-panel-title').textContent = meta.label;
+  document.getElementById('detail-panel-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+      <span class="badge ${meta.badge}" style="width:fit-content">${meta.label}</span>
+      <h2 style="font-size:var(--font-size-lg);font-weight:700">${c.subject}</h2>
+      <p style="font-size:var(--font-size-sm);line-height:1.6;white-space:pre-wrap">${c.message}</p>
+      <div style="border-top:1px solid var(--color-border);padding-top:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;justify-content:space-between;font-size:var(--font-size-sm)">
+          <span style="color:var(--color-text-secondary)">Enviado</span>
+          <span>${Utils.formatDate(c.sentAt)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--font-size-sm)">
+          <span style="color:var(--color-text-secondary)">Destinatarios</span>
+          <span><strong>${c.recipientCount}</strong> · ${recipLabel}</span>
+        </div>
+        ${sender ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:var(--font-size-sm)">
+          <span style="color:var(--color-text-secondary)">Enviado por</span>
+          <div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(sender,24)}<span>${sender.first_name} ${sender.last_name}</span></div>
+        </div>` : ''}
+      </div>
+      ${c.type === 'reminder' ? `
+      <button class="btn btn-primary" style="margin-top:var(--space-2)" onclick="closePanel('detail-panel');setTimeout(()=>document.querySelector('[data-tab=tab-recordatorios]')?.click(),100)">Ver alumnos con deuda</button>
+      ` : ''}
+    </div>
+  `;
+  document.getElementById('detail-backdrop').classList.add('open');
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+/* ── Reminder sending ─────────────────────────────────────────────── */
+function showReminderEmail(student, subject, message) {
+  const pending = MOCK_DB.transactions.filter(t => t.status === 'pending' && t.type === 'income' && t.student_id === student.id);
+  const total = pending.reduce((s,t) => s+t.amount, 0);
+  Utils.showEmailPreview(
+    student.email,
+    subject || `Recordatorio de pago — ${MOCK_DB.academy.name}`,
+    `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#333">
+      <div style="background:#6366f1;padding:24px 32px;border-radius:8px 8px 0 0">
+        <h2 style="color:#fff;margin:0;font-size:20px">${MOCK_DB.academy.name}</h2>
+      </div>
+      <div style="background:#fff;padding:24px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+        <p>Hola <strong>${student.first_name}</strong>,</p>
+        <p>${message || 'Te recordamos que tienes un pago pendiente.'}</p>
+        ${total > 0 ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;text-align:center"><p style="margin:0;color:#991b1b;font-size:18px;font-weight:700">Saldo pendiente: ${Utils.formatCurrency(total)}</p></div>` : ''}
+        <p>Por favor, acércate a nuestras instalaciones o contáctanos para regularizar tu situación.</p>
+        <p style="color:#888;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">Este es un recordatorio simulado para demostración.</p>
+      </div>
+    </div>`
+  );
+}
+
+function sendSingleReminder(studentId) {
+  const student = DB.getUser(studentId);
+  if (!student) return;
+  const subject = `Recordatorio de pago — ${new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'})}`;
+  const message = 'Te recordamos que tienes un pago pendiente. Por favor regulariza tu situación a la brevedad.';
+  showReminderEmail(student, subject, message);
+  Utils.toast('Recordatorio enviado', `${student.first_name} ${student.last_name}`, 'success');
+  COMUNICADOS.unshift({
+    id: 'c' + Date.now(), type: 'reminder', subject,
+    message, recipients: 'debtors', recipientCount: 1,
+    sentAt: new Date().toISOString(), sentBy: Auth.getCurrentUser().id
+  });
+  renderComunicados();
+}
+
+function sendSelectedReminders() {
+  const checked = [...document.querySelectorAll('.rem-cb:checked')];
+  if (!checked.length) { Utils.toast('', 'Selecciona al menos un alumno', 'warning'); return; }
+  const students = checked.map(cb => DB.getUser(cb.value)).filter(Boolean);
+  const subject = `Recordatorio de pago — ${new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'})}`;
+  const message = 'Te recordamos que tienes un pago pendiente. Por favor regulariza tu situación a la brevedad.';
+
+  if (students.length === 1) {
+    showReminderEmail(students[0], subject, message);
+  } else {
+    Utils.toast('Recordatorios enviados', `${students.length} recordatorios enviados correctamente`, 'success');
+  }
+
+  COMUNICADOS.unshift({
+    id: 'c' + Date.now(), type: 'reminder', subject,
+    message, recipients: 'debtors', recipientCount: students.length,
+    sentAt: new Date().toISOString(), sentBy: Auth.getCurrentUser().id
+  });
+
+  document.getElementById('select-all-cb').checked = false;
+  document.querySelectorAll('.rem-cb').forEach(cb => cb.checked = false);
+  renderComunicados();
+}
+
+/* ── Panel helpers ────────────────────────────────────────────────── */
+function closePanel(id) {
+  document.getElementById(id).classList.remove('open');
+  const bd = id.replace('-panel', '-backdrop');
+  const el = document.getElementById(bd);
+  if (el) el.classList.remove('open');
+}
+
+renderPage();
+</script>
+</body>
+</html>

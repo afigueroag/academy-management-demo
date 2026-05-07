@@ -37,7 +37,8 @@ function filteredTransactions() {
     const q = state.search.toLowerCase();
     list = list.filter(t => {
       const student = t.student_id ? DB.getUser(t.student_id) : null;
-      return t.description.toLowerCase().includes(q) ||
+      const concept = (t.description || t.subcategory || '').toLowerCase();
+      return concept.includes(q) ||
         (student && (`${student.first_name} ${student.last_name}`).toLowerCase().includes(q));
     });
   }
@@ -123,48 +124,76 @@ function renderPage() {
     </div>
 
     <!-- Modal: Registrar pago -->
-    <div class="modal-backdrop" id="new-pay-backdrop" onclick="closeModal('new-pay-modal')" style="display:none"></div>
-    <div class="modal" id="new-pay-modal" style="display:none;max-width:480px">
-      <div class="modal-header">
-        <h3>Registrar pago manual</h3>
-        <button class="btn btn-ghost btn-icon" onclick="closeModal('new-pay-modal')">✕</button>
+    <div class="modal-backdrop" id="new-pay-modal" onclick="if(event.target===this)closeModal('new-pay-modal')">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+          <h3 class="modal-title">Registrar pago manual</h3>
+          <button class="modal-close" onclick="closeModal('new-pay-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="label">Alumno</label>
+            <select id="np-student" class="input select">
+              <option value="">Seleccionar alumno…</option>
+              ${MOCK_DB.users.filter(u=>u.role==='student'&&u.is_active).map(s => `<option value="${s.id}">${s.first_name} ${s.last_name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="label">Concepto</label>
+            <select id="np-concept" class="input select">
+              <option value="Mensualidad">Mensualidad</option>
+              <option value="Inscripción">Inscripción</option>
+              <option value="Pago por clase">Pago por clase</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="label">Descripción adicional</label>
+            <input type="text" id="np-desc" class="input" placeholder="Detalles opcionales…">
+          </div>
+          <div class="form-group">
+            <label class="label">Monto</label>
+            <input type="number" id="np-amount" class="input" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label class="label">Método de pago</label>
+            <select id="np-method" class="input select">
+              <option value="cash">Efectivo</option>
+              <option value="transfer">Transferencia</option>
+              <option value="card">Tarjeta</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('new-pay-modal')">Cancelar</button>
+          <button class="btn btn-primary" onclick="processNewPayment()">Registrar</button>
+        </div>
       </div>
-      <div style="padding:var(--space-5)">
-        <div class="form-group">
-          <label class="label">Alumno</label>
-          <select id="np-student" class="input select">
-            <option value="">Seleccionar alumno…</option>
-            ${MOCK_DB.users.filter(u=>u.role==='student'&&u.is_active).map(s => `<option value="${s.id}">${s.first_name} ${s.last_name}</option>`).join('')}
-          </select>
+    </div>
+
+    <!-- Modal: Registrar pago de transacción -->
+    <div class="modal-backdrop" id="pay-txn-modal" onclick="if(event.target===this)closeModal('pay-txn-modal')">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Registrar pago</h3>
+          <button class="modal-close" onclick="closeModal('pay-txn-modal')">✕</button>
         </div>
-        <div class="form-group">
-          <label class="label">Concepto</label>
-          <select id="np-concept" class="input select">
-            <option value="Mensualidad">Mensualidad</option>
-            <option value="Inscripción">Inscripción</option>
-            <option value="Pago por clase">Pago por clase</option>
-            <option value="Otro">Otro</option>
-          </select>
+        <div class="modal-body">
+          <p style="margin-bottom:var(--space-1);font-weight:600" id="pt-info"></p>
+          <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin-bottom:var(--space-4)" id="pt-person"></p>
+          <div class="form-group">
+            <label class="label">Método de pago</label>
+            <select id="pt-method" class="input select">
+              <option value="cash">💵 Efectivo</option>
+              <option value="transfer">🏦 Transferencia</option>
+              <option value="card">💳 Tarjeta</option>
+              <option value="stripe">💳 Stripe</option>
+            </select>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="label">Descripción adicional</label>
-          <input type="text" id="np-desc" class="input" placeholder="Detalles opcionales…">
-        </div>
-        <div class="form-group">
-          <label class="label">Monto</label>
-          <input type="number" id="np-amount" class="input" placeholder="0.00" min="0" step="0.01">
-        </div>
-        <div class="form-group">
-          <label class="label">Método de pago</label>
-          <select id="np-method" class="input select">
-            <option value="cash">Efectivo</option>
-            <option value="transfer">Transferencia</option>
-            <option value="card">Tarjeta</option>
-          </select>
-        </div>
-        <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5)">
-          <button class="btn btn-outline" style="flex:1" onclick="closeModal('new-pay-modal')">Cancelar</button>
-          <button class="btn btn-primary" style="flex:1" onclick="processNewPayment()">Registrar</button>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('pay-txn-modal')">Cancelar</button>
+          <button class="btn btn-primary" onclick="confirmPayTxn()">Confirmar pago</button>
         </div>
       </div>
     </div>
@@ -201,9 +230,10 @@ function renderTable() {
       <table class="table">
         <thead><tr>
           <th>Fecha</th>
-          <th>Alumno / Instructor</th>
+          <th>Alumno / Cliente</th>
           <th>Concepto</th>
-          <th>Tipo</th>
+          <th>Categoría</th>
+          <th>Método</th>
           <th>Monto</th>
           <th>Estado</th>
           <th>Acciones</th>
@@ -221,16 +251,22 @@ function renderTable() {
                   </div>
                 ` : '<span style="color:var(--color-text-muted)">—</span>'}
               </td>
-              <td style="font-size:var(--text-sm)">${t.description}</td>
-              <td><span class="badge ${typeClass[t.type]||'badge-default'}">${typeLabel[t.type]||t.type}</span></td>
+              <td style="font-size:var(--text-sm)">${t.description || t.subcategory || '—'}</td>
+              <td>${person && t.student_id ? `${person.plan_id ? Utils.planBadge(person.plan_id) : ''}${(person.groups||[]).map(gid=>Utils.groupChip(gid)).join('')}` || '—' : '—'}</td>
+              <td style="font-size:var(--text-sm);white-space:nowrap">${
+                t.payment_method === 'cash'     ? '💵 Efectivo'      :
+                t.payment_method === 'transfer' ? '🏦 Transferencia' :
+                t.payment_method === 'card'     ? '💳 Tarjeta'       :
+                t.payment_method === 'stripe'   ? '💳 Stripe'        :
+                '<span style="color:var(--color-text-muted)">—</span>'
+              }</td>
               <td style="font-weight:600;white-space:nowrap">${Utils.formatCurrency(t.amount)}</td>
               <td><span class="badge ${statusClass[t.status]||'badge-default'}">${statusLabel[t.status]||t.status}</span></td>
               <td>
-                <div style="display:flex;gap:var(--space-2)">
-                  <button class="btn btn-ghost btn-icon" title="Ver detalle" onclick="openTxnPanel('${t.id}')">👁</button>
-                  ${t.status==='succeeded' ? `<button class="btn btn-ghost btn-icon" title="Simular recibo" onclick="showReceipt('${t.id}')">🧾</button>` : ''}
-                  ${t.status==='succeeded' && t.type==='income' ? `<button class="btn btn-ghost btn-icon" title="Reembolsar" onclick="refundTxn('${t.id}')" style="color:var(--color-danger)">↩️</button>` : ''}
-                  ${t.status==='pending' ? `<button class="btn btn-ghost btn-icon" title="Marcar pagado" onclick="markPaid('${t.id}')" style="color:var(--color-success)">✓</button>` : ''}
+                <div class="actions">
+                  ${t.status==='pending' ? `<button class="btn btn-primary btn-xs" onclick="openPayTxnModal('${t.id}')">Registrar Pago</button>` : ''}
+                  ${t.status==='succeeded' ? `<button class="btn btn-outline btn-xs" onclick="showReceipt('${t.id}')">Generar Recibo</button>` : ''}
+                  <button class="btn btn-outline btn-xs" onclick="openTxnPanel('${t.id}')">Ver detalles</button>
                 </div>
               </td>
             </tr>`;
@@ -245,12 +281,10 @@ function renderTable() {
 }
 
 function openModal(id) {
-  document.getElementById(id+'-backdrop').style.display = 'block';
-  document.getElementById(id).style.display = 'flex';
+  document.getElementById(id).classList.add('open');
 }
 function closeModal(id) {
-  document.getElementById(id).style.display = 'none';
-  document.getElementById(id+'-backdrop').style.display = 'none';
+  document.getElementById(id).classList.remove('open');
 }
 function closePanel(id) {
   document.getElementById(id).classList.remove('open');
@@ -302,7 +336,7 @@ function openTxnPanel(txnId) {
       </div>
       <div style="display:flex;justify-content:space-between">
         <span style="color:var(--color-text-muted)">Concepto</span>
-        <span>${t.description}</span>
+        <span>${t.description || t.subcategory || '—'}</span>
       </div>
       <div style="display:flex;justify-content:space-between">
         <span style="color:var(--color-text-muted)">Tipo</span>
@@ -324,9 +358,9 @@ function openTxnPanel(txnId) {
       </div>` : ''}
     </div>
     <div style="margin-top:var(--space-6);display:flex;flex-direction:column;gap:var(--space-3)">
-      ${t.status === 'succeeded' ? `<button class="btn btn-outline" onclick="showReceipt('${t.id}')">🧾 Ver recibo</button>` : ''}
-      ${t.status === 'succeeded' && t.type === 'income' ? `<button class="btn btn-danger" onclick="refundTxn('${t.id}');closePanel('txn-panel')">↩️ Reembolsar</button>` : ''}
-      ${t.status === 'pending' ? `<button class="btn btn-success" onclick="markPaid('${t.id}');closePanel('txn-panel')">✓ Marcar como pagado</button>` : ''}
+      ${t.status === 'pending' ? `<button class="btn btn-primary" onclick="closePanel('txn-panel');openPayTxnModal('${t.id}')">Registrar Pago</button>` : ''}
+      ${t.status === 'succeeded' ? `<button class="btn btn-outline" onclick="showReceipt('${t.id}')">Generar Recibo</button>` : ''}
+      ${t.status === 'succeeded' && t.type === 'income' ? `<button class="btn btn-danger" onclick="refundTxn('${t.id}');closePanel('txn-panel')">Registrar reembolso</button>` : ''}
     </div>
   `;
   document.getElementById('txn-backdrop').classList.add('open');
@@ -346,7 +380,7 @@ function showReceipt(txnId) {
       <table style="width:100%;border-collapse:collapse">
         <tr><td style="padding:8px 0;color:#666">Folio</td><td style="text-align:right;font-weight:600">${t.id}</td></tr>
         <tr><td style="padding:8px 0;color:#666">Fecha</td><td style="text-align:right">${Utils.formatDate(t.created_at)}</td></tr>
-        <tr><td style="padding:8px 0;color:#666">Concepto</td><td style="text-align:right">${t.description}</td></tr>
+        <tr><td style="padding:8px 0;color:#666">Concepto</td><td style="text-align:right">${t.description || t.subcategory || '—'}</td></tr>
         ${person ? `<tr><td style="padding:8px 0;color:#666">Alumno</td><td style="text-align:right">${person.first_name} ${person.last_name}</td></tr>` : ''}
         <tr style="border-top:2px solid #eee"><td style="padding:12px 0;font-weight:700">Total</td><td style="text-align:right;font-size:1.2em;font-weight:700;color:#6366f1">${Utils.formatCurrency(t.amount)}</td></tr>
       </table>
@@ -367,6 +401,31 @@ function markPaid(txnId) {
   const t = MOCK_DB.transactions.find(x => x.id === txnId);
   if (t) { t.status = 'succeeded'; }
   Utils.toast('Pago confirmado', 'Transacción marcada como pagada', 'success');
+  renderTable();
+}
+
+function openPayTxnModal(txnId) {
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (!t) return;
+  const person = t.student_id ? DB.getUser(t.student_id) : (t.instructor_id ? DB.getUser(t.instructor_id) : null);
+  document.getElementById('pt-info').textContent = `${t.description || t.subcategory || 'Pago'} · ${Utils.formatCurrency(t.amount)}`;
+  document.getElementById('pt-person').textContent = person ? `${person.first_name} ${person.last_name}` : '';
+  document.getElementById('pt-method').value = t.payment_method || 'cash';
+  document.getElementById('pay-txn-modal')._txnId = txnId;
+  openModal('pay-txn-modal');
+}
+
+function confirmPayTxn() {
+  const modal = document.getElementById('pay-txn-modal');
+  const txnId = modal._txnId;
+  const method = document.getElementById('pt-method').value;
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (!t) return;
+  t.status = 'succeeded';
+  t.payment_method = method;
+  t.paid_at = new Date().toISOString();
+  closeModal('pay-txn-modal');
+  Utils.toast('Pago registrado', `${Utils.formatCurrency(t.amount)} confirmado correctamente`, 'success');
   renderTable();
 }
 

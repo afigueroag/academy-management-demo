@@ -26,14 +26,8 @@ const main = document.getElementById('app-main');
 function buildStudentClasses(u) {
   const myEnrollments = MOCK_DB.enrollments.filter(e => e.student_id === u.id);
   const myClassIds = myEnrollments.filter(e => e.status === 'active' || e.status === 'waiting').map(e => e.class_id);
-  const studentCats = u.categories || [];
 
-  // Filter classes by student categories
-  const availableClasses = MOCK_DB.classes.filter(c => {
-    if (c.status !== 'active') return false;
-    if (studentCats.length === 0) return true;
-    return c.categories.some(catId => studentCats.includes(catId));
-  });
+  const availableClasses = MOCK_DB.classes.filter(c => c.status === 'active');
 
   function buildClassCard(cls, enrollment) {
     const instructor = DB.getUser(cls.instructor_id);
@@ -43,21 +37,36 @@ function buildStudentClasses(u) {
     const pct = cls.max_students ? Math.min(100, Math.round(enrolled / cls.max_students * 100)) : 0;
     const myEnroll = myEnrollments.find(e => e.class_id === cls.id);
 
+    const access = DB.checkEnrollAccess(u.id, cls.id);
     let ctaButton = '';
     if (myEnroll?.status === 'active') {
       const pendingTxn = MOCK_DB.transactions.find(t => t.student_id === u.id && t.class_id === cls.id && t.status === 'pending');
       ctaButton = `
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
           <span class="badge badge-success">Inscrito ✓</span>
-          ${pendingTxn ? `<button class="btn btn-primary btn-sm" onclick="openPayModal('${pendingTxn.id}','${cls.name}',${pendingTxn.amount})">Pagar ${Utils.formatCurrency(pendingTxn.amount)}</button>` : ''}
+          ${pendingTxn
+            ? `<button class="btn btn-primary btn-sm" onclick="openPayModal('${pendingTxn.id}','${cls.name}',${pendingTxn.amount})">Pagar ${Utils.formatCurrency(pendingTxn.amount)}</button>`
+            : `<button class="btn btn-outline-primary btn-sm" onclick="payInAdvance('${cls.id}','${cls.name}',${cls.price||0})">Pagar adelanto</button>`}
           <button class="btn btn-outline-danger btn-sm" onclick="cancelEnroll('${myEnroll.id}','${cls.name}')">Cancelar</button>
         </div>`;
     } else if (myEnroll?.status === 'waiting') {
       ctaButton = `<span class="badge badge-warning">Lista de espera #${myEnroll.waiting_position}</span>`;
+    } else if (access.level_block) {
+      ctaButton = `<span class="badge badge-danger" title="${access.reason}">Nivel insuficiente</span><div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-top:4px">${access.reason}</div>`;
     } else if (isFull) {
       ctaButton = `<button class="btn btn-outline btn-sm" onclick="joinWaitlist('${cls.id}','${cls.name}')">Unirse a lista de espera</button>`;
+    } else if (access.premium) {
+      ctaButton = `
+        <div>
+          <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:4px">No incluida en tu plan · costo individual</div>
+          <button class="btn btn-secondary btn-sm" onclick="enrollInClass('${cls.id}','${cls.name}',${access.price})">Inscribirse — ${Utils.formatCurrency(access.price)}</button>
+        </div>`;
     } else {
-      ctaButton = `<button class="btn btn-primary btn-sm" onclick="enrollInClass('${cls.id}','${cls.name}',${cls.price})">Inscribirse — ${Utils.formatCurrency(cls.price||0)}</button>`;
+      ctaButton = `
+        <div>
+          <div style="font-size:var(--font-size-xs);color:var(--color-success);margin-bottom:4px">✓ Incluida en tu plan</div>
+          <button class="btn btn-primary btn-sm" onclick="enrollInClass('${cls.id}','${cls.name}',${cls.price||0})">Inscribirse</button>
+        </div>`;
     }
 
     return `
@@ -80,7 +89,8 @@ function buildStudentClasses(u) {
           </div>
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)">
-          ${cls.categories.map(cid => Utils.categoryChip(cid)).join('')}
+          ${(cls.plan_ids||[]).map(pid => Utils.planBadge(pid)).join('')}
+          ${cls.min_group ? `<span style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Nivel mín: ${DB.getGroup(cls.min_group)?.name||''}</span>` : ''}
         </div>
         ${cls.max_students ? `
         <div style="margin-bottom:var(--space-3)">
@@ -117,7 +127,9 @@ function buildStudentClasses(u) {
           <td>${attRecords.length > 0 ? `<span style="font-weight:600;color:${attRate>=80?'var(--color-success)':attRate>=60?'var(--color-warning)':'var(--color-danger)'}">${attRate}%</span>` : '—'}</td>
           <td>
             <div class="actions">
-              ${pendingTxn ? `<button class="btn btn-primary btn-xs" onclick="openPayModal('${pendingTxn.id}','${cls?.name}',${pendingTxn.amount})">Pagar</button>` : ''}
+              ${pendingTxn
+                ? `<button class="btn btn-primary btn-xs" onclick="openPayModal('${pendingTxn.id}','${cls?.name}',${pendingTxn.amount})">Pagar</button>`
+                : `<button class="btn btn-outline-primary btn-xs" onclick="payInAdvance('${e.class_id}','${cls?.name}',${cls?.price||0})">Pagar adelanto</button>`}
               <button class="btn btn-outline-danger btn-xs" onclick="cancelEnroll('${e.id}','${cls?.name}')">Cancelar</button>
             </div>
           </td>
@@ -127,7 +139,7 @@ function buildStudentClasses(u) {
   return `
   <div class="page-header">
     <h2 class="page-title">Clases</h2>
-    <p class="page-subtitle">Explora y gestiona tus inscripciones · Tu plan: ${(u.categories||[]).map(cid=>{const c=DB.getCategory(cid);return c?`<strong>${c.name}</strong>`:''}).join(', ')||'Sin categoría'}</p>
+    <p class="page-subtitle">Explora y gestiona tus inscripciones · Tu plan: ${u.plan_id ? Utils.planBadge(u.plan_id) : '<span style="color:var(--color-text-secondary)">Sin plan asignado</span>'}</p>
   </div>
 
   <div class="tabs" id="class-tabs">
@@ -137,7 +149,7 @@ function buildStudentClasses(u) {
 
   <div id="tab-explore" class="tab-content active">
     ${availableClasses.length === 0
-      ? `<div class="empty-state"><div class="empty-state-icon">🏷️</div><h3>No hay clases disponibles</h3><p>Tu plan actual no incluye acceso a clases disponibles. Contacta al administrador para cambiar tu categoría.</p></div>`
+      ? `<div class="empty-state"><div class="empty-state-icon">📚</div><h3>No hay clases disponibles</h3><p>No hay clases activas en este momento.</p></div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-5)">${availableClasses.map(cls => buildClassCard(cls, myEnrollments.find(e=>e.class_id===cls.id))).join('')}</div>`}
   </div>
 
@@ -198,8 +210,8 @@ function buildInstructorClasses(u) {
                 <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Presentes hoy</div>
               </div>
               <div style="text-align:center">
-                <div style="font-size:var(--font-size-2xl);font-weight:700">${cls.categories.length}</div>
-                <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Categorías</div>
+                <div style="font-size:var(--font-size-2xl);font-weight:700">${(cls.plan_ids||[]).length}</div>
+                <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">Planes</div>
               </div>
             </div>
 
@@ -236,39 +248,274 @@ function buildInstructorClasses(u) {
 }
 
 /* ================================================================
-   ADMIN / RECEPTIONIST VIEW
+   ADMIN / RECEPTIONIST VIEW — module-level state
    ================================================================ */
-function buildAdminClasses(u) {
-  const allClasses = MOCK_DB.classes;
-  const [filterStatus, setFilterStatus] = [{ value: 'all' }, v => { filterStatus.value = v; renderAdminTable(); }];
+const adminState = { filterStatus: 'all', filterLocation: '', calView: 'week', calColorBy: 'location', calOffset: 0, viewMode: 'split' };
+const CAL_COLORS = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#84cc16'];
+const CAL_DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+const CAL_DAY_SHORT = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const CAL_HOUR_START = 7;
+const CAL_HOUR_END = 21;
+const CAL_HOUR_PX = 44;
 
-  const tableId = 'classes-admin-table';
-  function renderAdminTable() {
-    const filtered = filterStatus.value === 'all' ? allClasses : allClasses.filter(c => c.status === filterStatus.value);
-    const tbody = document.getElementById(tableId + '-body');
-    if (!tbody) return;
-    tbody.innerHTML = filtered.map(cls => {
-      const instructor = DB.getUser(cls.instructor_id);
-      const enrolled = DB.getEnrollmentsForClass(cls.id).length;
-      return `
-      <tr>
-        <td><div style="font-weight:600">${cls.name}</div><div style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${cls.categories.map(cid=>Utils.categoryChip(cid)).join(' ')}</div></td>
-        <td>${instructor?`<div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(instructor,'xs')}<span style="font-size:var(--font-size-sm)">${instructor.first_name} ${instructor.last_name}</span></div>`:'—'}</td>
-        <td style="font-size:var(--font-size-sm)">${Utils.dayLabel(cls.schedule_day)} · ${Utils.formatTime(cls.schedule_time)}</td>
-        <td style="text-align:center"><strong>${enrolled}</strong>${cls.max_students?`/${cls.max_students}`:''}</td>
-        <td>${Utils.formatCurrency(cls.price||0)}</td>
-        <td><span class="badge ${Utils.statusBadgeClass(cls.status)}">${Utils.statusLabel(cls.status)}</span></td>
-        <td>
-          <div class="actions">
-            <button class="btn btn-outline btn-xs" onclick="openEditClassModal('${cls.id}')">Editar</button>
-            ${u.role==='admin'?`<button class="btn btn-outline btn-xs" onclick="toggleArchive('${cls.id}','${cls.name}','${cls.status}')">${cls.status==='archived'?'Activar':'Archivar'}</button>`:''}
-          </div>
-        </td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin clases</td></tr>';
+function getClassSessions(cls) {
+  if (cls.schedule && cls.schedule.length) return cls.schedule;
+  return [{ day: cls.schedule_day, time: cls.schedule_time }];
+}
+
+function setAdminFilter(status, el) {
+  adminState.filterStatus = status;
+  document.querySelectorAll('#admin-status-chips .filter-chip').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderAdminTable();
+  renderAdminCalendar();
+  renderCompactClassList();
+}
+
+function setAdminLocation(val) {
+  adminState.filterLocation = val;
+  renderAdminTable();
+  renderAdminCalendar();
+  renderCompactClassList();
+}
+
+function setCalColorBy(val) {
+  adminState.calColorBy = val;
+  renderAdminCalendar();
+}
+
+function setCalView(view) {
+  adminState.calView = view;
+  adminState.calOffset = 0;
+  document.querySelectorAll('.cal-view-btn').forEach(b => {
+    const on = b.dataset.view === view;
+    b.style.background = on ? 'var(--color-primary)' : '';
+    b.style.color = on ? '#fff' : '';
+  });
+  renderAdminCalendar();
+}
+
+function calNav(dir) {
+  adminState.calOffset += dir;
+  renderAdminCalendar();
+}
+
+function filteredAdminClasses() {
+  return MOCK_DB.classes.filter(c => {
+    if (adminState.filterStatus !== 'all' && c.status !== adminState.filterStatus) return false;
+    if (adminState.filterLocation && c.location !== adminState.filterLocation) return false;
+    return true;
+  });
+}
+
+function getClassColor(cls) {
+  let key;
+  if (adminState.calColorBy === 'location') key = cls.location;
+  else if (adminState.calColorBy === 'plan') key = (cls.plan_ids||[])[0] || '';
+  else key = cls.instructor_id;
+  const allKeys = [...new Set(MOCK_DB.classes.map(c =>
+    adminState.calColorBy === 'location' ? c.location :
+    adminState.calColorBy === 'plan' ? ((c.plan_ids||[])[0] || '') : c.instructor_id
+  ))];
+  return CAL_COLORS[allKeys.indexOf(key) % CAL_COLORS.length] || CAL_COLORS[0];
+}
+
+function renderCalLegend() {
+  const seen = new Map();
+  MOCK_DB.classes.forEach(c => {
+    const key = adminState.calColorBy === 'location' ? c.location :
+                adminState.calColorBy === 'plan' ? ((c.plan_ids||[])[0] ? (DB.getPlan((c.plan_ids||[])[0])?.name || '—') : '—') :
+                (DB.getUser(c.instructor_id) ? DB.getUser(c.instructor_id).first_name + ' ' + DB.getUser(c.instructor_id).last_name : '—');
+    if (!seen.has(key)) seen.set(key, getClassColor(c));
+  });
+  return [...seen.entries()].map(([label, color]) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--font-size-xs)"><span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>${label}</span>`
+  ).join('');
+}
+
+function renderAdminCalendar() {
+  const el = document.getElementById('admin-calendar');
+  if (!el) return;
+  const legendEl = document.getElementById('cal-legend');
+  if (legendEl) legendEl.innerHTML = renderCalLegend();
+  if (adminState.calView === 'week') renderWeekView(el);
+  else renderMonthView(el);
+}
+
+function renderWeekView(el) {
+  const classes = filteredAdminClasses().filter(c => c.status === 'active');
+  const totalH = (CAL_HOUR_END - CAL_HOUR_START) * CAL_HOUR_PX;
+
+  // Compute Monday of the current week + offset
+  const now = new Date();
+  const todayDow = (now.getDay() + 6) % 7; // Monday=0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - todayDow + adminState.calOffset * 7);
+
+  const weekDates = CAL_DAY_KEYS.map((_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
+  const weekLabel = `${weekDates[0].getDate()} ${weekDates[0].toLocaleDateString('es-MX',{month:'short'})} – ${weekDates[6].getDate()} ${weekDates[6].toLocaleDateString('es-MX',{month:'short',year:'numeric'})}`;
+  const monthLabel = document.getElementById('cal-month-label');
+  if (monthLabel) monthLabel.textContent = weekLabel;
+
+  const hours = [];
+  for (let h = CAL_HOUR_START; h <= CAL_HOUR_END; h++) {
+    hours.push(`<div style="height:${CAL_HOUR_PX}px;border-bottom:1px solid var(--color-border);display:flex;align-items:flex-start;padding-top:2px;font-size:10px;color:var(--color-text-secondary)">${String(h).padStart(2,'0')}:00</div>`);
   }
 
-  setTimeout(renderAdminTable, 0);
+  const todayStr = now.toISOString().split('T')[0];
+  const dayCols = CAL_DAY_KEYS.map((day, di) => {
+    const dayClasses = classes.filter(c => getClassSessions(c).some(s => s.day === day));
+    const dateStr = weekDates[di].toISOString().split('T')[0];
+    const isToday = dateStr === todayStr;
+    const events = dayClasses.map(cls => {
+      const sessions = getClassSessions(cls).filter(s => s.day === day);
+      const color = getClassColor(cls);
+      const instructor = DB.getUser(cls.instructor_id);
+      return sessions.map(session => {
+        const [hh, mm] = session.time.split(':').map(Number);
+        const top = (hh + mm / 60 - CAL_HOUR_START) * CAL_HOUR_PX;
+        const height = Math.max(22, cls.duration_minutes / 60 * CAL_HOUR_PX - 2);
+        return `<div title="${cls.name} · ${Utils.formatTime(session.time)} · ${cls.duration_minutes}min" style="position:absolute;top:${top}px;left:2px;right:2px;height:${height}px;background:${color};border-radius:4px;padding:2px 4px;overflow:hidden;cursor:pointer;opacity:0.9" onclick="openEditClassModal('${cls.id}')">
+          <div style="font-size:10px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cls.name}</div>
+          ${height > 28 ? `<div style="font-size:9px;color:rgba(255,255,255,0.85)">${Utils.formatTime(session.time)}${instructor?' · '+instructor.first_name:''}</div>` : ''}
+        </div>`;
+      }).join('');
+    }).join('');
+    return `<div style="flex:1;min-width:0;border-left:1px solid var(--color-border)">
+      <div style="text-align:center;font-size:var(--font-size-xs);font-weight:600;padding:6px 2px;border-bottom:1px solid var(--color-border);background:${isToday?'var(--color-primary-light, #e0e7ff)':'var(--color-gray-50)'};color:${isToday?'var(--color-primary)':'inherit'}">${CAL_DAY_SHORT[di]} <span style="font-weight:400">${weekDates[di].getDate()}</span></div>
+      <div style="position:relative;height:${totalH}px">${events}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div style="display:flex;overflow-x:auto">
+    <div style="width:36px;flex-shrink:0;padding-top:29px">${hours.join('')}</div>
+    ${dayCols}
+  </div>`;
+}
+
+function renderMonthView(el) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + adminState.calOffset;
+  const d = new Date(year, month, 1);
+  const displayMonth = d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+
+  const monthLabel = document.getElementById('cal-month-label');
+  if (monthLabel) monthLabel.textContent = displayMonth.charAt(0).toUpperCase() + displayMonth.slice(1);
+
+  const firstDow = (d.getDay() + 6) % 7; // Monday=0
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const classes = filteredAdminClasses().filter(c => c.status === 'active');
+
+  const dayOfWeekToIndex = { monday:0, tuesday:1, wednesday:2, thursday:3, friday:4, saturday:5, sunday:6 };
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(`<div style="border:1px solid var(--color-border);min-height:80px;background:var(--color-gray-50)"></div>`);
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dow = (firstDow + day - 1) % 7;
+    const dayClasses = classes.filter(c => getClassSessions(c).some(s => dayOfWeekToIndex[s.day] === dow));
+    const chips = dayClasses.map(cls => {
+      const color = getClassColor(cls);
+      return `<div style="background:${color};color:#fff;border-radius:3px;padding:1px 4px;font-size:9px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer" onclick="openEditClassModal('${cls.id}')" title="${cls.name}">${cls.name}</div>`;
+    }).join('');
+    cells.push(`<div style="border:1px solid var(--color-border);min-height:80px;padding:4px">
+      <div style="font-size:var(--font-size-xs);font-weight:600;margin-bottom:4px">${day}</div>
+      ${chips}
+    </div>`);
+  }
+
+  const headers = CAL_DAY_SHORT.map(d => `<div style="text-align:center;font-size:var(--font-size-xs);font-weight:600;padding:6px;background:var(--color-gray-50);border:1px solid var(--color-border)">${d}</div>`).join('');
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,1fr)">${headers}${cells.join('')}</div>`;
+}
+
+function renderAdminTable() {
+  const tbody = document.getElementById('classes-admin-table-body');
+  if (!tbody) return;
+  const filtered = filteredAdminClasses();
+  const role = (typeof _adminRole !== 'undefined') ? _adminRole : (Auth.getCurrentUser()?.role || 'admin');
+  tbody.innerHTML = filtered.map(cls => {
+    const instructor = DB.getUser(cls.instructor_id);
+    const enrolled = DB.getEnrollmentsForClass(cls.id).length;
+    return `
+    <tr>
+      <td>
+        <div style="font-weight:600">${cls.name}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">
+          ${(cls.groups||[]).map(gid=>Utils.groupChip(gid)).join('')}
+          ${(cls.plan_ids||[]).map(pid=>Utils.planBadge(pid)).join('')}
+          ${cls.min_group?`<span style="font-size:11px;color:var(--color-text-muted)">Niv. mín: ${DB.getGroup(cls.min_group)?.name||''}</span>`:''}
+        </div>
+      </td>
+      <td>${instructor?`<div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(instructor,'xs')}<span style="font-size:var(--font-size-sm)">${instructor.first_name} ${instructor.last_name}</span></div>`:'—'}</td>
+      <td style="font-size:var(--font-size-sm)">${getClassSessions(cls).map(s=>`${Utils.dayLabel(s.day)} ${Utils.formatTime(s.time)}`).join('<br>')}</td>
+      <td style="font-size:var(--font-size-sm)">${cls.location||'—'}</td>
+      <td style="text-align:center"><strong>${enrolled}</strong>${cls.max_students?`/${cls.max_students}`:''}</td>
+      <td>${Utils.formatCurrency(cls.price||0)}</td>
+      <td><span class="badge ${Utils.statusBadgeClass(cls.status)}">${Utils.statusLabel(cls.status)}</span></td>
+      <td>
+        <div class="actions">
+          <button class="btn btn-outline btn-xs" onclick="openEditClassModal('${cls.id}')">Editar</button>
+          ${role==='admin'?`<button class="btn btn-outline btn-xs" onclick="toggleArchive('${cls.id}','${cls.name}','${cls.status}')">${cls.status==='archived'?'Activar':'Archivar'}</button>`:''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin clases</td></tr>';
+}
+
+function setAdminViewMode(mode) {
+  adminState.viewMode = mode;
+  document.querySelectorAll('.view-mode-btn').forEach(b => {
+    const on = b.dataset.mode === mode;
+    b.style.background = on ? 'var(--color-primary)' : '';
+    b.style.color = on ? '#fff' : '';
+  });
+  const splitView = document.getElementById('admin-split-view');
+  const listView = document.getElementById('admin-list-view');
+  if (splitView) splitView.style.display = mode === 'split' ? 'flex' : 'none';
+  if (listView) listView.style.display = mode === 'list' ? 'block' : 'none';
+  if (mode === 'split') renderCompactClassList();
+}
+
+function renderCompactClassList() {
+  const el = document.getElementById('compact-class-list');
+  if (!el) return;
+  const filtered = filteredAdminClasses();
+  if (!filtered.length) {
+    el.innerHTML = `<div style="padding:var(--space-4);text-align:center;color:var(--color-text-muted)">Sin clases</div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(cls => {
+    const instructor = DB.getUser(cls.instructor_id);
+    const color = getClassColor(cls);
+    const sessions = getClassSessions(cls);
+    const enrolled = DB.getEnrollmentsForClass(cls.id).length;
+    return `
+    <div style="display:flex;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border);cursor:pointer" onmouseover="this.style.background='var(--color-gray-50, #f9fafb)'" onmouseout="this.style.background=''" onclick="openEditClassModal('${cls.id}')">
+      <div style="width:4px;flex-shrink:0;background:${color};border-radius:2px;align-self:stretch;min-height:44px"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:var(--font-size-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cls.name}</div>
+        <div style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:2px">${sessions.map(s=>`${Utils.dayLabel(s.day)} ${Utils.formatTime(s.time)}`).join(' · ')}</div>
+        <div style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:2px">${instructor?instructor.first_name+' '+instructor.last_name:''}${instructor&&cls.location?' · ':''}${cls.location||''}</div>
+      </div>
+      <span class="badge ${Utils.statusBadgeClass(cls.status)}" style="align-self:flex-start;flex-shrink:0;margin-top:2px">${Utils.statusLabel(cls.status)}</span>
+    </div>`;
+  }).join('');
+}
+
+let _adminRole = 'admin';
+function buildAdminClasses(u) {
+  _adminRole = u.role;
+  const allClasses = MOCK_DB.classes;
+  const locations = [...new Set(allClasses.map(c => c.location).filter(Boolean))];
+
+  setTimeout(() => {
+    renderAdminTable();
+    renderAdminCalendar();
+    renderCompactClassList();
+    const weekBtn = document.querySelector('.cal-view-btn[data-view="week"]');
+    if (weekBtn) { weekBtn.style.background = 'var(--color-primary)'; weekBtn.style.color = '#fff'; }
+    const splitBtn = document.querySelector('.view-mode-btn[data-mode="split"]');
+    if (splitBtn) { splitBtn.style.background = 'var(--color-primary)'; splitBtn.style.color = '#fff'; }
+  }, 0);
 
   return `
   <div class="page-header">
@@ -276,22 +523,70 @@ function buildAdminClasses(u) {
     <p class="page-subtitle">${allClasses.filter(c=>c.status==='active').length} activas · ${allClasses.filter(c=>c.status==='archived').length} archivadas</p>
   </div>
 
-  <div class="toolbar">
-    <div class="filter-chips">
-      <button class="filter-chip active" onclick="setFilterStatus('all');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Todas</button>
-      <button class="filter-chip" onclick="setFilterStatus('active');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Activas</button>
-      <button class="filter-chip" onclick="setFilterStatus('draft');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Borradores</button>
-      <button class="filter-chip" onclick="setFilterStatus('archived');this.closest('.filter-chips').querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Archivadas</button>
+  <div class="toolbar" style="flex-wrap:wrap;gap:var(--space-3)">
+    <div class="filter-chips" id="admin-status-chips">
+      <button class="filter-chip active" onclick="setAdminFilter('all',this)">Todas</button>
+      <button class="filter-chip" onclick="setAdminFilter('active',this)">Activas</button>
+      <button class="filter-chip" onclick="setAdminFilter('draft',this)">Borradores</button>
+      <button class="filter-chip" onclick="setAdminFilter('archived',this)">Archivadas</button>
     </div>
-    ${u.role==='admin' ? `<button class="btn btn-primary btn-sm ml-auto" onclick="openNewClassModal()">+ Nueva clase</button>` : ''}
+    <select class="input" style="width:auto;font-size:var(--font-size-sm);padding:6px 10px;height:36px" onchange="setAdminLocation(this.value)">
+      <option value="">Todas las ubicaciones</option>
+      ${locations.map(l=>`<option value="${l}">${l}</option>`).join('')}
+    </select>
+    <div style="display:flex;border:1px solid var(--color-border);border-radius:var(--radius);overflow:hidden;margin-left:auto">
+      <button class="view-mode-btn btn btn-xs" data-mode="split" onclick="setAdminViewMode('split')" style="border-radius:0;border:none" title="Vista dividida">⊞ Dividida</button>
+      <button class="view-mode-btn btn btn-xs" data-mode="list" onclick="setAdminViewMode('list')" style="border-radius:0;border:none;border-left:1px solid var(--color-border)" title="Vista lista">☰ Lista</button>
+    </div>
+    ${u.role==='admin' ? `<button class="btn btn-primary btn-sm" onclick="openNewClassModal()">+ Nueva clase</button>` : ''}
   </div>
 
-  <div class="table-wrapper">
-    <div class="table-responsive">
-      <table class="table" id="${tableId}">
-        <thead><tr><th>Clase</th><th>Instructor</th><th>Horario</th><th style="text-align:center">Inscritos</th><th>Precio</th><th>Estado</th><th style="text-align:right">Acciones</th></tr></thead>
-        <tbody id="${tableId}-body"></tbody>
-      </table>
+  <!-- SPLIT VIEW: calendar left + compact list right -->
+  <div id="admin-split-view" style="display:flex;gap:var(--space-5);align-items:flex-start">
+    <div class="card" style="flex:1.6;min-width:0">
+      <div class="card-header" style="flex-wrap:wrap;gap:var(--space-3)">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <button class="btn btn-outline btn-xs" onclick="calNav(-1)">‹</button>
+          <span id="cal-month-label" style="font-size:var(--font-size-sm);font-weight:600;min-width:160px;text-align:center"></span>
+          <button class="btn btn-outline btn-xs" onclick="calNav(1)">›</button>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+          <div style="display:flex;border:1px solid var(--color-border);border-radius:var(--radius);overflow:hidden">
+            <button class="cal-view-btn btn btn-xs active" data-view="week" onclick="setCalView('week')" style="border-radius:0;border:none">Semana</button>
+            <button class="cal-view-btn btn btn-xs" data-view="month" onclick="setCalView('month')" style="border-radius:0;border:none;border-left:1px solid var(--color-border)">Mes</button>
+          </div>
+          <select class="input" style="width:auto;font-size:var(--font-size-xs);padding:4px 8px;height:30px" onchange="setCalColorBy(this.value)">
+            <option value="location">Color: Ubicación</option>
+            <option value="plan">Color: Plan</option>
+            <option value="instructor">Color: Instructor</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;overflow:hidden">
+        <div id="admin-calendar" style="overflow-x:auto"></div>
+      </div>
+      <div class="card-footer" style="display:flex;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-3) var(--space-4)">
+        <div id="cal-legend" style="display:flex;gap:var(--space-3);flex-wrap:wrap"></div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;min-width:260px;max-width:360px;position:sticky;top:var(--space-4)">
+      <div class="card-header">
+        <span style="font-size:var(--font-size-sm);font-weight:600">Clases</span>
+      </div>
+      <div id="compact-class-list" style="overflow-y:auto;max-height:700px"></div>
+    </div>
+  </div>
+
+  <!-- LIST VIEW: full table -->
+  <div id="admin-list-view" style="display:none">
+    <div class="table-wrapper">
+      <div class="table-responsive">
+        <table class="table" id="classes-admin-table">
+          <thead><tr><th>Clase</th><th>Instructor</th><th>Horario</th><th>Ubicación</th><th style="text-align:center">Inscritos</th><th>Precio</th><th>Estado</th><th style="text-align:right">Acciones</th></tr></thead>
+          <tbody id="classes-admin-table-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>`;
 }
@@ -370,6 +665,13 @@ function cancelEnroll(enrollmentId, className) {
   DB.cancelEnrollment(enrollmentId);
   Utils.toast('Inscripción cancelada', `Se canceló tu inscripción en ${className}.`, 'warning');
   setTimeout(() => location.reload(), 700);
+}
+
+// STUDENT: Pay in advance (creates a new pending transaction then opens pay modal)
+function payInAdvance(classId, className, price) {
+  if (!confirm(`¿Realizar un pago adelantado de ${Utils.formatCurrency(price)} por ${className}?`)) return;
+  const txn = DB.addTransaction({ type:'income', category:'enrollment', subcategory:'Mensualidad adelantada', amount: price, status:'pending', payment_method:null, student_id:user.id, class_id:classId, due_date:new Date().toISOString().split('T')[0], paid_at:null, notes:'Pago adelantado' });
+  openPayModal(txn.id, className, price);
 }
 
 // STUDENT: Pay
@@ -548,6 +850,33 @@ function toggleArchive(classId, className, currentStatus) {
   setTimeout(() => location.reload(), 700);
 }
 
+// ADMIN: Dynamic session row helpers
+const _DAY_OPTS = `<option value="monday">Lunes</option><option value="tuesday">Martes</option><option value="wednesday">Miércoles</option><option value="thursday">Jueves</option><option value="friday">Viernes</option><option value="saturday">Sábado</option><option value="sunday">Domingo</option>`;
+
+function _buildSessionRow(day = 'monday', time = '10:00') {
+  return `<div class="nc-session-row" style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
+    <select class="input select nc-day-sel" style="flex:1"><option value="monday" ${day==='monday'?'selected':''}>Lunes</option><option value="tuesday" ${day==='tuesday'?'selected':''}>Martes</option><option value="wednesday" ${day==='wednesday'?'selected':''}>Miércoles</option><option value="thursday" ${day==='thursday'?'selected':''}>Jueves</option><option value="friday" ${day==='friday'?'selected':''}>Viernes</option><option value="saturday" ${day==='saturday'?'selected':''}>Sábado</option><option value="sunday" ${day==='sunday'?'selected':''}>Domingo</option></select>
+    <input type="time" class="input nc-time-sel" value="${time}" style="width:110px">
+    <button type="button" class="btn btn-ghost btn-xs nc-remove-row" onclick="removeSessionRow(this)" style="color:var(--color-danger);padding:4px 8px;visibility:hidden">✕</button>
+  </div>`;
+}
+
+function addSessionRow() {
+  const container = document.getElementById('nc-sessions');
+  if (!container) return;
+  const rows = container.querySelectorAll('.nc-session-row');
+  if (rows.length >= 7) return;
+  if (rows.length === 1) rows[0].querySelector('.nc-remove-row').style.visibility = '';
+  container.insertAdjacentHTML('beforeend', _buildSessionRow());
+}
+
+function removeSessionRow(btn) {
+  const container = document.getElementById('nc-sessions');
+  btn.closest('.nc-session-row').remove();
+  const rows = container.querySelectorAll('.nc-session-row');
+  if (rows.length === 1) rows[0].querySelector('.nc-remove-row').style.visibility = 'hidden';
+}
+
 // ADMIN: New class modal (simple)
 function openNewClassModal() {
   let modal = document.getElementById('new-class-modal');
@@ -556,27 +885,64 @@ function openNewClassModal() {
     modal.id = 'new-class-modal';
     modal.className = 'modal-backdrop';
     const instructors = DB.getInstructors();
-    const catOptions = MOCK_DB.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     const instrOptions = instructors.map(i => `<option value="${i.id}">${i.first_name} ${i.last_name}</option>`).join('');
+    const planCheckboxes = MOCK_DB.plans.filter(p=>p.is_active).map(p =>
+      `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--font-size-sm)"><input type="checkbox" class="nc-plan-cb" value="${p.id}"> ${p.name}</label>`
+    ).join('');
+    const levelGroups = DB.getGroupsByAxis('axis_001');
+    const minGroupOptions = levelGroups.map(g => `<option value="${g.id}">${g.order}. ${g.name}</option>`).join('');
+    const groupsByAxis = MOCK_DB.axes.map(axis => {
+      const gs = DB.getGroupsByAxis(axis.id);
+      return `<div style="margin-bottom:var(--space-3)">
+        <div style="font-size:var(--font-size-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:var(--space-2)">${axis.name}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+          ${gs.map(g => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:var(--font-size-sm);padding:3px 8px;border-radius:9999px;border:1px solid ${g.color}44;background:${g.color}11"><input type="checkbox" class="nc-group-cb" value="${g.id}" style="accent-color:${g.color}"><span style="color:${g.color}">${g.name}</span></label>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
     modal.innerHTML = `
       <div class="modal modal-lg">
         <div class="modal-header"><h3 class="modal-title">Nueva clase</h3><button class="modal-close" onclick="Utils.closeModal('new-class-modal')">✕</button></div>
-        <div class="modal-body">
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto">
           <div class="form-row">
             <div class="form-group" style="margin:0"><label class="label label-required">Nombre</label><input type="text" class="input" id="nc-name" placeholder="ej. Ballet Avanzado"></div>
             <div class="form-group" style="margin:0"><label class="label label-required">Instructor</label><select class="input select" id="nc-inst">${instrOptions}</select></div>
           </div>
-          <div class="form-row" style="margin-top:var(--space-4)">
-            <div class="form-group" style="margin:0"><label class="label">Día</label><select class="input select" id="nc-day"><option value="monday">Lunes</option><option value="tuesday">Martes</option><option value="wednesday">Miércoles</option><option value="thursday">Jueves</option><option value="friday">Viernes</option><option value="saturday">Sábado</option><option value="sunday">Domingo</option></select></div>
-            <div class="form-group" style="margin:0"><label class="label">Hora</label><input type="time" class="input" id="nc-time" value="10:00"></div>
+
+          <div class="form-group" style="margin-top:var(--space-4)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+              <label class="label" style="margin:0">Horario <span style="font-weight:400;color:var(--color-text-muted);font-size:var(--font-size-xs)">(puedes agregar varios días)</span></label>
+              <button type="button" class="btn btn-ghost btn-xs" onclick="addSessionRow()" style="font-size:var(--font-size-xs)">+ Agregar día</button>
+            </div>
+            <div id="nc-sessions">${_buildSessionRow()}</div>
           </div>
+
           <div class="form-row" style="margin-top:var(--space-4)">
             <div class="form-group" style="margin:0"><label class="label">Duración (min)</label><input type="number" class="input" id="nc-duration" value="60" min="15"></div>
             <div class="form-group" style="margin:0"><label class="label">Capacidad máx.</label><input type="number" class="input" id="nc-capacity" value="15" min="1"></div>
           </div>
           <div class="form-row" style="margin-top:var(--space-4)">
-            <div class="form-group" style="margin:0"><label class="label">Precio/mes</label><input type="number" class="input" id="nc-price" placeholder="ej. 600"></div>
+            <div class="form-group" style="margin:0"><label class="label">Precio individual</label><input type="number" class="input" id="nc-price" placeholder="ej. 600"></div>
             <div class="form-group" style="margin:0"><label class="label">Ubicación</label><input type="text" class="input" id="nc-location" placeholder="ej. Salón B"></div>
+          </div>
+
+          <div class="form-group" style="margin-top:var(--space-4)">
+            <label class="label">Grupos</label>
+            <div style="border:1px solid var(--color-border);border-radius:var(--radius);padding:var(--space-3)">${groupsByAxis}</div>
+          </div>
+
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0">
+              <label class="label">Planes que incluyen esta clase</label>
+              <div style="display:flex;flex-direction:column;gap:6px;border:1px solid var(--color-border);border-radius:var(--radius);padding:var(--space-3)">${planCheckboxes||'Sin planes activos'}</div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="label">Nivel mínimo requerido <span style="font-weight:400;color:var(--color-text-muted)">(opcional)</span></label>
+              <select class="input select" id="nc-mingroup">
+                <option value="">Sin restricción</option>
+                ${minGroupOptions}
+              </select>
+            </div>
           </div>
           <div class="form-group" style="margin-top:var(--space-4)"><label class="label">Descripción</label><textarea class="input" id="nc-desc" rows="2" placeholder="Descripción de la clase..."></textarea></div>
         </div>
@@ -588,6 +954,12 @@ function openNewClassModal() {
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if(e.target===modal) Utils.closeModal('new-class-modal'); });
   }
+  // Reset form on each open
+  const sessionsEl = document.getElementById('nc-sessions');
+  if (sessionsEl) { sessionsEl.innerHTML = _buildSessionRow(); }
+  document.querySelectorAll('.nc-plan-cb, .nc-group-cb').forEach(cb => cb.checked = false);
+  const nameEl = document.getElementById('nc-name');
+  if (nameEl) { nameEl.value = ''; document.getElementById('nc-desc').value = ''; document.getElementById('nc-location').value = ''; }
   Utils.openModal('new-class-modal');
 }
 
@@ -595,22 +967,207 @@ function createClass() {
   const name = document.getElementById('nc-name').value.trim();
   if (!name) { Utils.toast('Campo requerido', 'El nombre de la clase es obligatorio.', 'error'); return; }
   const id = 'class_' + String(MOCK_DB.classes.length + 1).padStart(3,'0');
+  const planIds = [...document.querySelectorAll('.nc-plan-cb:checked')].map(cb => cb.value);
+  const groupIds = [...document.querySelectorAll('.nc-group-cb:checked')].map(cb => cb.value);
+  const minGroup = document.getElementById('nc-mingroup')?.value || null;
+  const sessions = [...document.querySelectorAll('#nc-sessions .nc-session-row')].map(row => ({
+    day: row.querySelector('.nc-day-sel').value,
+    time: row.querySelector('.nc-time-sel').value
+  }));
+  const firstSession = sessions[0] || { day: 'monday', time: '10:00' };
   MOCK_DB.classes.push({
     id, academy_id:'acad_001', name, description: document.getElementById('nc-desc').value,
     instructor_id: document.getElementById('nc-inst').value, status:'active', recurrence:'weekly',
-    schedule_day: document.getElementById('nc-day').value, schedule_time: document.getElementById('nc-time').value,
+    schedule_day: firstSession.day, schedule_time: firstSession.time,
+    schedule: sessions,
     duration_minutes: parseInt(document.getElementById('nc-duration').value)||60,
     max_students: parseInt(document.getElementById('nc-capacity').value)||15,
     price: parseFloat(document.getElementById('nc-price').value)||0,
-    location: document.getElementById('nc-location').value, categories:[], created_at: new Date().toISOString()
+    location: document.getElementById('nc-location').value,
+    plan_ids: planIds, min_group: minGroup || null, groups: groupIds,
+    created_at: new Date().toISOString()
   });
   Utils.closeModal('new-class-modal');
   Utils.toast('Clase creada', `La clase "${name}" fue creada exitosamente.`, 'success');
   setTimeout(() => location.reload(), 700);
 }
 
+function _buildEcSessionRow(day = 'monday', time = '10:00') {
+  return `<div class="ec-session-row" style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
+    <select class="input select ec-day-sel" style="flex:1">
+      <option value="monday" ${day==='monday'?'selected':''}>Lunes</option>
+      <option value="tuesday" ${day==='tuesday'?'selected':''}>Martes</option>
+      <option value="wednesday" ${day==='wednesday'?'selected':''}>Miércoles</option>
+      <option value="thursday" ${day==='thursday'?'selected':''}>Jueves</option>
+      <option value="friday" ${day==='friday'?'selected':''}>Viernes</option>
+      <option value="saturday" ${day==='saturday'?'selected':''}>Sábado</option>
+      <option value="sunday" ${day==='sunday'?'selected':''}>Domingo</option>
+    </select>
+    <input type="time" class="input ec-time-sel" value="${time}" style="width:110px">
+    <button type="button" class="btn btn-ghost btn-xs ec-remove-row" onclick="removeEcSessionRow(this)" style="color:var(--color-danger);padding:4px 8px;visibility:hidden">✕</button>
+  </div>`;
+}
+
+function addEcSessionRow() {
+  const container = document.getElementById('ec-sessions');
+  if (!container) return;
+  const rows = container.querySelectorAll('.ec-session-row');
+  if (rows.length >= 7) return;
+  if (rows.length === 1) rows[0].querySelector('.ec-remove-row').style.visibility = '';
+  container.insertAdjacentHTML('beforeend', _buildEcSessionRow());
+}
+
+function removeEcSessionRow(btn) {
+  const container = document.getElementById('ec-sessions');
+  btn.closest('.ec-session-row').remove();
+  const rows = container.querySelectorAll('.ec-session-row');
+  if (rows.length === 1) rows[0].querySelector('.ec-remove-row').style.visibility = 'hidden';
+}
+
 function openEditClassModal(classId) {
-  Utils.toast('Editar clase', 'Funcionalidad completa disponible en la Parte 3.', 'info');
+  const cls = DB.getClass(classId);
+  if (!cls) return;
+
+  let modal = document.getElementById('edit-class-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'edit-class-modal';
+    modal.className = 'modal-backdrop';
+    const instrOptions = DB.getInstructors().map(i => `<option value="${i.id}">${i.first_name} ${i.last_name}</option>`).join('');
+    const planCheckboxes = MOCK_DB.plans.filter(p => p.is_active).map(p =>
+      `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--font-size-sm)"><input type="checkbox" class="ec-plan-cb" value="${p.id}"> ${p.name}</label>`
+    ).join('');
+    const levelGroups = DB.getGroupsByAxis('axis_001');
+    const minGroupOptions = levelGroups.map(g => `<option value="${g.id}">${g.order}. ${g.name}</option>`).join('');
+    const groupsByAxis = MOCK_DB.axes.map(axis => {
+      const gs = DB.getGroupsByAxis(axis.id);
+      return `<div style="margin-bottom:var(--space-3)">
+        <div style="font-size:var(--font-size-xs);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:var(--space-2)">${axis.name}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+          ${gs.map(g => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:var(--font-size-sm);padding:3px 8px;border-radius:9999px;border:1px solid ${g.color}44;background:${g.color}11"><input type="checkbox" class="ec-group-cb" value="${g.id}" style="accent-color:${g.color}"><span style="color:${g.color}">${g.name}</span></label>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
+    modal.innerHTML = `
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <h3 class="modal-title">Editar clase</h3>
+          <button class="modal-close" onclick="Utils.closeModal('edit-class-modal')">✕</button>
+        </div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+          <div class="form-row">
+            <div class="form-group" style="margin:0"><label class="label label-required">Nombre</label><input type="text" class="input" id="ec-name"></div>
+            <div class="form-group" style="margin:0"><label class="label label-required">Instructor</label><select class="input select" id="ec-inst">${instrOptions}</select></div>
+          </div>
+          <div class="form-group" style="margin-top:var(--space-4)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+              <label class="label" style="margin:0">Horario <span style="font-weight:400;color:var(--color-text-muted);font-size:var(--font-size-xs)">(puedes agregar varios días)</span></label>
+              <button type="button" class="btn btn-ghost btn-xs" onclick="addEcSessionRow()" style="font-size:var(--font-size-xs)">+ Agregar día</button>
+            </div>
+            <div id="ec-sessions"></div>
+          </div>
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0"><label class="label">Duración (min)</label><input type="number" class="input" id="ec-duration" min="15"></div>
+            <div class="form-group" style="margin:0"><label class="label">Capacidad máx.</label><input type="number" class="input" id="ec-capacity" min="1"></div>
+          </div>
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0"><label class="label">Precio individual</label><input type="number" class="input" id="ec-price"></div>
+            <div class="form-group" style="margin:0"><label class="label">Ubicación</label><input type="text" class="input" id="ec-location"></div>
+          </div>
+          <div class="form-group" style="margin-top:var(--space-4)">
+            <label class="label">Estado</label>
+            <select class="input select" id="ec-status">
+              <option value="active">Activa</option>
+              <option value="draft">Borrador</option>
+              <option value="archived">Archivada</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-top:var(--space-4)">
+            <label class="label">Grupos</label>
+            <div style="border:1px solid var(--color-border);border-radius:var(--radius);padding:var(--space-3)">${groupsByAxis}</div>
+          </div>
+          <div class="form-row" style="margin-top:var(--space-4)">
+            <div class="form-group" style="margin:0">
+              <label class="label">Planes que incluyen esta clase</label>
+              <div style="display:flex;flex-direction:column;gap:6px;border:1px solid var(--color-border);border-radius:var(--radius);padding:var(--space-3)">${planCheckboxes||'Sin planes activos'}</div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="label">Nivel mínimo requerido <span style="font-weight:400;color:var(--color-text-muted)">(opcional)</span></label>
+              <select class="input select" id="ec-mingroup">
+                <option value="">Sin restricción</option>
+                ${minGroupOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:var(--space-4)"><label class="label">Descripción</label><textarea class="input" id="ec-desc" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="Utils.closeModal('edit-class-modal')">Cancelar</button>
+          <button class="btn btn-primary" id="ec-save-btn">Guardar cambios</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) Utils.closeModal('edit-class-modal'); });
+  }
+
+  // Populate fields
+  document.getElementById('ec-name').value = cls.name;
+  document.getElementById('ec-inst').value = cls.instructor_id;
+  document.getElementById('ec-duration').value = cls.duration_minutes;
+  document.getElementById('ec-capacity').value = cls.max_students || '';
+  document.getElementById('ec-price').value = cls.price || '';
+  document.getElementById('ec-location').value = cls.location || '';
+  document.getElementById('ec-desc').value = cls.description || '';
+  document.getElementById('ec-status').value = cls.status;
+  document.getElementById('ec-mingroup').value = cls.min_group || '';
+
+  // Sessions
+  const sessions = getClassSessions(cls);
+  const ec = document.getElementById('ec-sessions');
+  ec.innerHTML = sessions.map(s => _buildEcSessionRow(s.day, s.time)).join('');
+  const ecRows = ec.querySelectorAll('.ec-session-row');
+  if (ecRows.length > 1) ecRows.forEach(r => r.querySelector('.ec-remove-row').style.visibility = '');
+
+  // Checkboxes
+  document.querySelectorAll('.ec-plan-cb').forEach(cb => { cb.checked = (cls.plan_ids||[]).includes(cb.value); });
+  document.querySelectorAll('.ec-group-cb').forEach(cb => { cb.checked = (cls.groups||[]).includes(cb.value); });
+
+  document.getElementById('ec-save-btn').onclick = () => saveEditClass(classId);
+  Utils.openModal('edit-class-modal');
+}
+
+function saveEditClass(classId) {
+  const name = document.getElementById('ec-name').value.trim();
+  if (!name) { Utils.toast('Campo requerido', 'El nombre es obligatorio.', 'error'); return; }
+  const cls = DB.getClass(classId);
+  if (!cls) return;
+
+  const sessions = [...document.querySelectorAll('#ec-sessions .ec-session-row')].map(row => ({
+    day: row.querySelector('.ec-day-sel').value,
+    time: row.querySelector('.ec-time-sel').value
+  }));
+  const first = sessions[0] || { day: 'monday', time: '10:00' };
+
+  cls.name            = name;
+  cls.instructor_id   = document.getElementById('ec-inst').value;
+  cls.duration_minutes= parseInt(document.getElementById('ec-duration').value) || 60;
+  cls.max_students    = parseInt(document.getElementById('ec-capacity').value) || null;
+  cls.price           = parseFloat(document.getElementById('ec-price').value) || 0;
+  cls.location        = document.getElementById('ec-location').value;
+  cls.description     = document.getElementById('ec-desc').value;
+  cls.status          = document.getElementById('ec-status').value;
+  cls.min_group       = document.getElementById('ec-mingroup').value || null;
+  cls.schedule_day    = first.day;
+  cls.schedule_time   = first.time;
+  cls.schedule        = sessions;
+  cls.plan_ids        = [...document.querySelectorAll('.ec-plan-cb:checked')].map(cb => cb.value);
+  cls.groups          = [...document.querySelectorAll('.ec-group-cb:checked')].map(cb => cb.value);
+
+  Utils.closeModal('edit-class-modal');
+  Utils.toast('Clase actualizada', `"${name}" guardada.`, 'success');
+  renderAdminTable();
+  renderAdminCalendar();
+  renderCompactClassList();
 }
 </script>
 </body>

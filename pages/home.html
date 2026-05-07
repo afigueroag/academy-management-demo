@@ -49,7 +49,7 @@ function buildStudentHome(u) {
   const enrollments = DB.getEnrollmentsForStudent(u.id);
   const debt = DB.getStudentDebt(u.id);
   const attendanceRate = DB.getAttendanceRate(u.id);
-  const categories = (u.categories || []).map(cid => DB.getCategory(cid)).filter(Boolean);
+  const plan = u.plan_id ? DB.getPlan(u.plan_id) : null;
 
   // Próxima clase
   let nextClassLabel = 'Sin clases';
@@ -85,7 +85,7 @@ function buildStudentHome(u) {
               <span style="font-size:var(--font-size-sm)">${inst ? inst.first_name + ' ' + inst.last_name : '—'}</span>
             </div>
           </td>
-          <td>${(cls?.categories||[]).map(cid => Utils.categoryChip(cid)).join(' ')}</td>
+          <td>${(cls?.plan_ids||[]).map(pid => Utils.planBadge(pid)).join('')}</td>
           <td>
             ${pendingTxn
               ? `<span class="badge badge-warning">Pendiente ${Utils.formatCurrency(pendingTxn.amount)}</span>`
@@ -115,7 +115,7 @@ function buildStudentHome(u) {
         <div class="scorecard-icon bg-primary-light">📚</div>
       </div>
       <div class="scorecard-value">${enrollments.length}</div>
-      <div class="scorecard-footer">${categories.map(c=>`<span class="chip" style="background:${c.color}22;color:${c.color}">${c.name}</span>`).join(' ') || 'Sin categoría asignada'}</div>
+      <div class="scorecard-footer">${plan ? `<span class="chip" style="background:${plan.color}22;color:${plan.color}">${plan.name}</span>` : 'Sin plan asignado'}</div>
     </div>
     <div class="scorecard">
       <div class="scorecard-top">

@@ -14,7 +14,7 @@
 <script src="../js/auth.js"></script>
 <script src="../js/utils.js"></script>
 <script>
-Auth.requireRole(['admin']);
+Auth.requireRole(['admin', 'receptionist']);
 Utils.renderAppLayout('Instructores', 'instructors');
 
 function getInstructors() {
@@ -123,9 +123,10 @@ function renderPage() {
                 <td>${paid > 0 ? `<span style="color:var(--color-success);font-weight:600">${Utils.formatCurrency(paid)}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                 <td><span class="badge ${inst.is_active?'badge-success':'badge-default'}">${inst.is_active?'Activo':'Inactivo'}</span></td>
                 <td>
-                  <div style="display:flex;gap:var(--space-2)">
-                    <button class="btn btn-ghost btn-icon" title="Ver detalle" onclick="openViewPanel('${inst.id}')">👁</button>
-                    <button class="btn btn-ghost btn-icon" title="Registrar nómina" onclick="openPayrollModal('${inst.id}')" ${!inst.is_active?'disabled':''}>💰</button>
+                  <div class="actions">
+                    <button class="btn btn-primary btn-xs" onclick="openPayrollModal('${inst.id}')" ${!inst.is_active?'disabled':''}>Pagar</button>
+                    <button class="btn btn-outline btn-xs" onclick="openEditPanel('${inst.id}')">Editar</button>
+                    <button class="btn btn-outline btn-xs" onclick="openViewPanel('${inst.id}')">Ver detalles</button>
                   </div>
                 </td>
               </tr>`;
@@ -193,6 +194,14 @@ function renderPage() {
           <label class="label">Especialidad / disciplina</label>
           <input type="text" id="cr-spec" class="input" placeholder="Ballet, Piano, Yoga…">
         </div>
+        <div class="form-group">
+          <label class="label">Credenciales</label>
+          <input type="text" id="cr-credentials" class="input" placeholder="Cinta negra, Conservatorio Nacional…">
+        </div>
+        <div class="form-group">
+          <label class="label">Fecha de inicio</label>
+          <input type="date" id="cr-start" class="input">
+        </div>
         <button class="btn btn-primary btn-block" onclick="createInstructor()">Agregar instructor</button>
       </div>
     </div>
@@ -207,14 +216,25 @@ function renderPage() {
       <div id="view-panel-body" style="padding:var(--space-5)"></div>
     </div>
 
-    <!-- Modal: Registrar nómina -->
-    <div class="modal-backdrop" id="payroll-modal-backdrop" onclick="closeModal('payroll-modal')" style="display:none"></div>
-    <div class="modal" id="payroll-modal" style="display:none;max-width:440px">
-      <div class="modal-header">
-        <h3 id="payroll-modal-title">Registrar nómina</h3>
-        <button class="btn btn-ghost btn-icon" onclick="closeModal('payroll-modal')">✕</button>
+    <!-- Panel: Editar instructor -->
+    <div class="side-panel-backdrop" id="edit-backdrop" onclick="closePanel('edit-panel')"></div>
+    <div class="side-panel" id="edit-panel" style="width:480px">
+      <div class="side-panel-header">
+        <h3 id="edit-panel-title">Editar instructor</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('edit-panel')">✕</button>
       </div>
-      <div id="payroll-modal-body" style="padding:var(--space-5)"></div>
+      <div id="edit-panel-body" style="padding:var(--space-5);overflow-y:auto;max-height:calc(100vh - 80px)"></div>
+    </div>
+
+    <!-- Modal: Registrar nómina -->
+    <div class="modal-backdrop" id="payroll-modal" onclick="if(event.target===this)closeModal('payroll-modal')">
+      <div class="modal" style="max-width:440px">
+        <div class="modal-header">
+          <h3 class="modal-title" id="payroll-modal-title">Registrar nómina</h3>
+          <button class="modal-close" onclick="closeModal('payroll-modal')">✕</button>
+        </div>
+        <div id="payroll-modal-body" class="modal-body"></div>
+      </div>
     </div>
   `;
 }
@@ -234,8 +254,7 @@ function closePanel(id) {
   if (el) el.classList.remove('open');
 }
 function closeModal(id) {
-  document.getElementById(id).style.display = 'none';
-  document.getElementById(id+'-backdrop').style.display = 'none';
+  document.getElementById(id).classList.remove('open');
 }
 
 function sendInvite() {
@@ -269,6 +288,9 @@ function createInstructor() {
     is_active: true,
     hourly_rate: rate,
     payroll_type: 'hourly',
+    specialty: document.getElementById('cr-spec').value.trim(),
+    credentials: document.getElementById('cr-credentials').value.trim(),
+    start_date: document.getElementById('cr-start').value || new Date().toISOString().split('T')[0],
     email_verified_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     categories: []
@@ -330,7 +352,7 @@ function openViewPanel(instId) {
       ${payrollTxns.length ? payrollTxns.map(t => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
           <div>
-            <div style="font-size:var(--text-sm)">${t.description}</div>
+            <div style="font-size:var(--text-sm)">${t.description || t.subcategory || '—'}</div>
             <div style="font-size:var(--text-xs);color:var(--color-text-muted)">${Utils.formatDate(t.created_at)}</div>
           </div>
           <span class="badge ${t.status==='succeeded'?'badge-success':'badge-warning'}">${Utils.formatCurrency(t.amount)}</span>
@@ -339,10 +361,88 @@ function openViewPanel(instId) {
     </div>
     <div style="display:flex;flex-direction:column;gap:var(--space-3)">
       <button class="btn btn-primary" onclick="openPayrollModal('${instId}');closePanel('view-panel')">Registrar nómina</button>
+      <button class="btn btn-outline" onclick="openEditPanel('${instId}');closePanel('view-panel')">Editar instructor</button>
     </div>
   `;
   document.getElementById('view-backdrop').classList.add('open');
   document.getElementById('view-panel').classList.add('open');
+}
+
+function openEditPanel(instId) {
+  const inst = DB.getUser(instId);
+  if (!inst) return;
+  document.getElementById('edit-panel-title').textContent = `Editar — ${inst.first_name} ${inst.last_name}`;
+  document.getElementById('edit-panel-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="label">Nombre</label>
+        <input type="text" id="ed-first" class="input" value="${inst.first_name}">
+      </div>
+      <div class="form-group">
+        <label class="label">Apellido</label>
+        <input type="text" id="ed-last" class="input" value="${inst.last_name}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="label">Correo electrónico</label>
+      <input type="email" id="ed-email" class="input" value="${inst.email}">
+    </div>
+    <div class="form-group">
+      <label class="label">Teléfono</label>
+      <input type="tel" id="ed-phone" class="input" value="${inst.phone||''}">
+    </div>
+    <div class="form-group">
+      <label class="label">Tarifa por hora</label>
+      <input type="number" id="ed-rate" class="input" value="${inst.hourly_rate||''}" placeholder="300" min="0">
+    </div>
+    <div class="form-group">
+      <label class="label">Especialidad / disciplina</label>
+      <input type="text" id="ed-spec" class="input" value="${inst.specialty||''}" placeholder="Ballet, Piano, Yoga…">
+    </div>
+    <div class="form-group">
+      <label class="label">Credenciales</label>
+      <input type="text" id="ed-credentials" class="input" value="${inst.credentials||''}" placeholder="Cinta negra, Conservatorio Nacional…">
+    </div>
+    <div class="form-group">
+      <label class="label">Fecha de inicio</label>
+      <input type="date" id="ed-start" class="input" value="${inst.start_date||inst.created_at?.split('T')[0]||''}">
+    </div>
+    <div class="form-group">
+      <label class="label">Dirección</label>
+      <input type="text" id="ed-addr" class="input" value="${inst.address||''}">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="saveInstructor('${inst.id}')">Guardar cambios</button>
+    <hr style="margin:var(--space-5) 0;border:none;border-top:1px solid var(--color-border)">
+    <button class="btn ${inst.is_active?'btn-outline-danger':'btn-success'} btn-block" onclick="toggleInstructor('${inst.id}',${!inst.is_active});closePanel('edit-panel')">${inst.is_active?'Desactivar instructor':'Activar instructor'}</button>
+  `;
+  document.getElementById('edit-backdrop').classList.add('open');
+  document.getElementById('edit-panel').classList.add('open');
+}
+
+function saveInstructor(instId) {
+  const inst = DB.getUser(instId);
+  if (!inst) return;
+  inst.first_name   = document.getElementById('ed-first').value.trim() || inst.first_name;
+  inst.last_name    = document.getElementById('ed-last').value.trim()  || inst.last_name;
+  inst.email        = document.getElementById('ed-email').value.trim() || inst.email;
+  inst.phone        = document.getElementById('ed-phone').value.trim();
+  inst.hourly_rate  = parseFloat(document.getElementById('ed-rate').value) || inst.hourly_rate;
+  inst.specialty    = document.getElementById('ed-spec').value.trim();
+  inst.credentials  = document.getElementById('ed-credentials').value.trim();
+  inst.start_date   = document.getElementById('ed-start').value;
+  inst.address      = document.getElementById('ed-addr').value.trim();
+  closePanel('edit-panel');
+  Utils.toast('Instructor actualizado', `${inst.first_name} ${inst.last_name} fue actualizado correctamente.`, 'success');
+  renderPage();
+}
+
+function toggleInstructor(instId, active) {
+  const inst = DB.getUser(instId);
+  if (!inst) return;
+  if (!active && !confirm(`¿Desactivar a ${inst.first_name} ${inst.last_name}?`)) return;
+  inst.is_active = active;
+  Utils.toast(active ? 'Instructor activado' : 'Instructor desactivado', `${inst.first_name} ${inst.last_name}`, active?'success':'warning');
+  renderPage();
 }
 
 function openPayrollModal(instId) {
@@ -392,8 +492,7 @@ function openPayrollModal(instId) {
       <button class="btn btn-primary" style="flex:1" onclick="processPayroll('${instId}')">Registrar pago</button>
     </div>
   `;
-  document.getElementById('payroll-modal-backdrop').style.display = 'block';
-  document.getElementById('payroll-modal').style.display = 'flex';
+  document.getElementById('payroll-modal').classList.add('open');
 }
 
 function processPayroll(instId) {

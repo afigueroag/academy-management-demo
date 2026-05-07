@@ -22,7 +22,7 @@ const user = Auth.getCurrentUser();
 const state = {
   search: '',
   filterStatus: 'active',
-  filterCategory: '',
+  filterPlan: '',
   filterDebt: '',
   selectedStudent: null
 };
@@ -35,7 +35,7 @@ function filteredStudents() {
   let list = getStudents();
   if (state.filterStatus === 'active') list = list.filter(u => u.is_active);
   else if (state.filterStatus === 'inactive') list = list.filter(u => !u.is_active);
-  if (state.filterCategory) list = list.filter(u => u.categories.includes(state.filterCategory));
+  if (state.filterPlan) list = list.filter(u => u.plan_id === state.filterPlan);
   if (state.filterDebt === 'yes') list = list.filter(u => DB.getStudentDebt(u.id) > 0);
   else if (state.filterDebt === 'no') list = list.filter(u => DB.getStudentDebt(u.id) === 0);
   if (state.search) {
@@ -119,9 +119,9 @@ function renderPage() {
           <option value="inactive" ${state.filterStatus==='inactive'?'selected':''}>Inactivos</option>
           <option value="all" ${state.filterStatus==='all'?'selected':''}>Todos</option>
         </select>
-        <select class="input select" style="width:auto" onchange="state.filterCategory=this.value;renderTable()">
-          <option value="">Todas las categorías</option>
-          ${MOCK_DB.categories.map(c => `<option value="${c.id}" ${state.filterCategory===c.id?'selected':''}>${c.name}</option>`).join('')}
+        <select class="input select" style="width:auto" onchange="state.filterPlan=this.value;renderTable()">
+          <option value="">Todos los planes</option>
+          ${MOCK_DB.plans.map(p => `<option value="${p.id}" ${state.filterPlan===p.id?'selected':''}>${p.name}</option>`).join('')}
         </select>
         <select class="input select" style="width:auto" onchange="state.filterDebt=this.value;renderTable()">
           <option value="">Cualquier deuda</option>
@@ -150,10 +150,10 @@ function renderPage() {
           <input type="email" id="inv-email" class="input" placeholder="alumno@ejemplo.com">
         </div>
         <div class="form-group">
-          <label class="label">Categoría de suscripción</label>
+          <label class="label">Plan de membresía</label>
           <select id="inv-cat" class="input select">
             <option value="">Sin asignar</option>
-            ${MOCK_DB.categories.map(c => `<option value="${c.id}">${c.name} — ${Utils.formatCurrency(c.monthly_fee)}/mes</option>`).join('')}
+            ${MOCK_DB.plans.filter(p=>p.is_active).map(p => `<option value="${p.id}">${p.name} — ${Utils.formatCurrency(p.monthly_fee)}/mes</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -195,10 +195,31 @@ function renderPage() {
           <input type="date" id="cr-dob" class="input">
         </div>
         <div class="form-group">
-          <label class="label">Categoría de suscripción</label>
-          <select id="cr-cat" class="input select">
+          <label class="label">Plan de membresía</label>
+          <select id="cr-plan" class="input select">
+            <option value="">Sin plan</option>
+            ${MOCK_DB.plans.filter(p=>p.is_active).map(p => `<option value="${p.id}">${p.name} — ${Utils.formatCurrency(p.monthly_fee)}/mes</option>`).join('')}
+          </select>
+        </div>
+        ${MOCK_DB.axes.map(axis => `
+        <div class="form-group">
+          <label class="label">${axis.name}${axis.ordered ? ' <span style="font-size:11px;color:var(--color-text-muted)">(ordenado)</span>' : ''}</label>
+          <select id="cr-grp-${axis.id}" class="input select">
             <option value="">Sin asignar</option>
-            ${MOCK_DB.categories.map(c => `<option value="${c.id}">${c.name} — ${Utils.formatCurrency(c.monthly_fee)}/mes</option>`).join('')}
+            ${DB.getGroupsByAxis(axis.id).map(g => `<option value="${g.id}">${axis.ordered ? g.order + '. ' : ''}${g.name}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+        <div class="form-group">
+          <label class="label">Fecha de inicio</label>
+          <input type="date" id="cr-start" class="input">
+        </div>
+        <div class="form-group">
+          <label class="label">Método de pago</label>
+          <select id="cr-method" class="input select">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+            <option value="card">Tarjeta</option>
+            <option value="stripe">Stripe</option>
           </select>
         </div>
         <div class="form-group">
@@ -219,14 +240,25 @@ function renderPage() {
       <div id="view-panel-body" style="padding:var(--space-5)"></div>
     </div>
 
-    <!-- Modal: Registrar pago -->
-    <div class="modal-backdrop" id="pay-modal-backdrop" onclick="closeModal('pay-modal')" style="display:none"></div>
-    <div class="modal" id="pay-modal" style="display:none;max-width:440px">
-      <div class="modal-header">
-        <h3 id="pay-modal-title">Registrar pago</h3>
-        <button class="btn btn-ghost btn-icon" onclick="closeModal('pay-modal')">✕</button>
+    <!-- Panel: Editar alumno -->
+    <div class="side-panel-backdrop" id="edit-backdrop" onclick="closePanel('edit-panel')"></div>
+    <div class="side-panel" id="edit-panel" style="width:480px">
+      <div class="side-panel-header">
+        <h3 id="edit-panel-title">Editar alumno</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('edit-panel')">✕</button>
       </div>
-      <div id="pay-modal-body" style="padding:var(--space-5)"></div>
+      <div id="edit-panel-body" style="padding:var(--space-5);overflow-y:auto;max-height:calc(100vh - 80px)"></div>
+    </div>
+
+    <!-- Modal: Registrar pago / Cambiar categoría -->
+    <div class="modal-backdrop" id="pay-modal" onclick="if(event.target===this)closeModal('pay-modal')">
+      <div class="modal" style="max-width:440px">
+        <div class="modal-header">
+          <h3 class="modal-title" id="pay-modal-title">Registrar pago</h3>
+          <button class="modal-close" onclick="closeModal('pay-modal')">✕</button>
+        </div>
+        <div id="pay-modal-body" class="modal-body"></div>
+      </div>
     </div>
   `;
 
@@ -246,7 +278,7 @@ function renderTable() {
       <table class="table">
         <thead><tr>
           <th>Alumno</th>
-          <th>Categorías</th>
+          <th>Plan / Grupos</th>
           <th>Clases</th>
           <th>Deuda</th>
           <th>Asistencia</th>
@@ -268,7 +300,12 @@ function renderTable() {
                   </div>
                 </div>
               </td>
-              <td>${s.categories.length ? s.categories.map(c => Utils.categoryChip(c)).join('') : '<span style="color:var(--color-text-muted);font-size:var(--text-xs)">Sin categoría</span>'}</td>
+              <td>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+                  ${s.plan_id ? Utils.planBadge(s.plan_id) : '<span style="color:var(--color-text-muted);font-size:var(--text-xs)">Sin plan</span>'}
+                  ${(s.groups||[]).map(gid => Utils.groupChip(gid)).join('')}
+                </div>
+              </td>
               <td><span style="font-weight:500">${enrolls}</span> activas</td>
               <td>${debt > 0 ? `<span style="color:var(--color-danger);font-weight:600">${Utils.formatCurrency(debt)}</span>` : '<span style="color:var(--color-success)">—</span>'}</td>
               <td>
@@ -281,12 +318,10 @@ function renderTable() {
               </td>
               <td><span class="badge ${s.is_active?'badge-success':'badge-default'}">${s.is_active?'Activo':'Inactivo'}</span></td>
               <td>
-                <div style="display:flex;gap:var(--space-2)">
-                  <button class="btn btn-ghost btn-icon" title="Ver detalle" onclick="openViewPanel('${s.id}')">👁</button>
-                  ${debt > 0 ? `<button class="btn btn-ghost btn-icon" title="Registrar pago" onclick="openPayModal('${s.id}')">💳</button>` : ''}
-                  ${s.is_active
-                    ? `<button class="btn btn-ghost btn-icon" title="Desactivar" onclick="toggleStudent('${s.id}',false)" style="color:var(--color-danger)">🚫</button>`
-                    : `<button class="btn btn-ghost btn-icon" title="Activar" onclick="toggleStudent('${s.id}',true)" style="color:var(--color-success)">✓</button>`}
+                <div class="actions">
+                  <button class="btn btn-primary btn-xs" onclick="openPayModal('${s.id}')">Pagar</button>
+                  <button class="btn btn-outline btn-xs" onclick="openEditPanel('${s.id}')">Editar</button>
+                  <button class="btn btn-outline btn-xs" onclick="openViewPanel('${s.id}')">Ver detalles</button>
                 </div>
               </td>
             </tr>`;
@@ -314,8 +349,7 @@ function closePanel(id) {
   if (el) el.classList.remove('open');
 }
 function closeModal(id) {
-  document.getElementById(id).style.display = 'none';
-  document.getElementById(id+'-backdrop').style.display = 'none';
+  document.getElementById(id).classList.remove('open');
 }
 
 function sendInvite() {
@@ -340,7 +374,8 @@ function createStudent() {
   const last = document.getElementById('cr-last').value.trim();
   const email = document.getElementById('cr-email').value.trim();
   if (!first || !last || !email) { Utils.toast('Campos requeridos','Completa nombre, apellido y correo','error'); return; }
-  const catId = document.getElementById('cr-cat').value;
+  const planId = document.getElementById('cr-plan').value;
+  const groups = MOCK_DB.axes.map(ax => document.getElementById('cr-grp-' + ax.id)?.value).filter(Boolean);
   const newUser = {
     id: 'user_' + (MOCK_DB.users.length + 1).toString().padStart(3,'0'),
     email, first_name: first, last_name: last,
@@ -351,7 +386,10 @@ function createStudent() {
     is_active: true, hourly_rate: null, payroll_type: null,
     email_verified_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
-    categories: catId ? [catId] : []
+    start_date: document.getElementById('cr-start').value || new Date().toISOString().split('T')[0],
+    payment_method: document.getElementById('cr-method').value,
+    plan_id: planId || null,
+    groups
   };
   MOCK_DB.users.push(newUser);
   closePanel('create-panel');
@@ -374,7 +412,10 @@ function openViewPanel(userId) {
       <div>
         <div style="font-weight:600;font-size:var(--text-lg)">${s.first_name} ${s.last_name}</div>
         <div style="color:var(--color-text-muted);font-size:var(--text-sm)">${s.email}</div>
-        <div style="margin-top:var(--space-2)">${s.categories.map(c=>Utils.categoryChip(c)).join('') || '<span style="color:var(--color-text-muted);font-size:var(--text-xs)">Sin categoría</span>'}</div>
+        <div style="margin-top:var(--space-2);display:flex;flex-wrap:wrap;gap:4px">
+          ${s.plan_id ? Utils.planBadge(s.plan_id) : '<span style="color:var(--color-text-muted);font-size:var(--text-xs)">Sin plan</span>'}
+          ${(s.groups||[]).map(gid => Utils.groupChip(gid)).join('')}
+        </div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5)">
@@ -398,19 +439,104 @@ function openViewPanel(userId) {
       <div style="font-weight:600;margin-bottom:var(--space-3)">Últimas transacciones</div>
       ${txns.length ? txns.map(t => `
         <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
-          <span style="font-size:var(--text-sm)">${t.description}</span>
+          <span style="font-size:var(--text-sm)">${t.description || t.subcategory || '—'}</span>
           <span style="font-weight:600;color:${t.status==='succeeded'?'var(--color-success)':'var(--color-warning)'}">${Utils.formatCurrency(t.amount)}</span>
         </div>
       `).join('') : '<p style="color:var(--color-text-muted);font-size:var(--text-sm)">Sin transacciones</p>'}
     </div>
     <div style="display:flex;flex-direction:column;gap:var(--space-3)">
       ${debt > 0 ? `<button class="btn btn-primary" onclick="openPayModal('${s.id}');closePanel('view-panel')">Registrar pago — ${Utils.formatCurrency(debt)}</button>` : ''}
-      <button class="btn btn-outline" onclick="openCatModal('${s.id}')">Cambiar categoría</button>
-      <button class="btn ${s.is_active?'btn-danger':'btn-success'}" onclick="toggleStudent('${s.id}',${!s.is_active});closePanel('view-panel')">${s.is_active?'Desactivar alumno':'Activar alumno'}</button>
+      <button class="btn btn-outline" onclick="openEditPanel('${s.id}');closePanel('view-panel')">Editar alumno</button>
     </div>
   `;
   document.getElementById('view-backdrop').classList.add('open');
   document.getElementById('view-panel').classList.add('open');
+}
+
+function openEditPanel(userId) {
+  const s = DB.getUser(userId);
+  if (!s) return;
+  document.getElementById('edit-panel-title').textContent = `Editar — ${s.first_name} ${s.last_name}`;
+  const methodMap = { cash:'Efectivo', transfer:'Transferencia', card:'Tarjeta', stripe:'Stripe' };
+  document.getElementById('edit-panel-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="label">Nombre</label>
+        <input type="text" id="ed-first" class="input" value="${s.first_name}">
+      </div>
+      <div class="form-group">
+        <label class="label">Apellido</label>
+        <input type="text" id="ed-last" class="input" value="${s.last_name}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="label">Correo electrónico</label>
+      <input type="email" id="ed-email" class="input" value="${s.email}">
+    </div>
+    <div class="form-group">
+      <label class="label">Teléfono</label>
+      <input type="tel" id="ed-phone" class="input" value="${s.phone||''}">
+    </div>
+    <div class="form-group">
+      <label class="label">Fecha de nacimiento</label>
+      <input type="date" id="ed-dob" class="input" value="${s.date_of_birth||''}">
+    </div>
+    <div class="form-group">
+      <label class="label">Plan de membresía</label>
+      <select id="ed-plan" class="input select">
+        <option value="">Sin plan</option>
+        ${MOCK_DB.plans.map(p => `<option value="${p.id}" ${s.plan_id===p.id?'selected':''}>${p.name} — ${Utils.formatCurrency(p.monthly_fee)}/mes${p.is_active?'':' (archivado)'}</option>`).join('')}
+      </select>
+    </div>
+    ${MOCK_DB.axes.map(axis => `
+    <div class="form-group">
+      <label class="label">${axis.name}${axis.ordered ? ' <span style="font-size:11px;color:var(--color-text-muted)">(ordenado)</span>' : ''}</label>
+      <select id="ed-grp-${axis.id}" class="input select">
+        <option value="">Sin asignar</option>
+        ${DB.getGroupsByAxis(axis.id).map(g => `<option value="${g.id}" ${(s.groups||[]).includes(g.id)?'selected':''}>${axis.ordered ? g.order + '. ' : ''}${g.name}</option>`).join('')}
+      </select>
+    </div>`).join('')}
+    <div class="form-group">
+      <label class="label">Fecha de inicio</label>
+      <input type="date" id="ed-start" class="input" value="${s.start_date||s.created_at?.split('T')[0]||''}">
+    </div>
+    <div class="form-group">
+      <label class="label">Método de pago</label>
+      <select id="ed-method" class="input select">
+        <option value="cash" ${(s.payment_method||'cash')==='cash'?'selected':''}>Efectivo</option>
+        <option value="transfer" ${s.payment_method==='transfer'?'selected':''}>Transferencia</option>
+        <option value="card" ${s.payment_method==='card'?'selected':''}>Tarjeta</option>
+        <option value="stripe" ${s.payment_method==='stripe'?'selected':''}>Stripe</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="label">Dirección</label>
+      <input type="text" id="ed-addr" class="input" value="${s.address||''}">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="saveStudent('${s.id}')">Guardar cambios</button>
+    <hr style="margin:var(--space-5) 0;border:none;border-top:1px solid var(--color-border)">
+    <button class="btn ${s.is_active?'btn-outline-danger':'btn-success'} btn-block" onclick="toggleStudent('${s.id}',${!s.is_active});closePanel('edit-panel')">${s.is_active?'Desactivar alumno':'Activar alumno'}</button>
+  `;
+  document.getElementById('edit-backdrop').classList.add('open');
+  document.getElementById('edit-panel').classList.add('open');
+}
+
+function saveStudent(userId) {
+  const s = DB.getUser(userId);
+  if (!s) return;
+  s.first_name = document.getElementById('ed-first').value.trim() || s.first_name;
+  s.last_name  = document.getElementById('ed-last').value.trim()  || s.last_name;
+  s.email      = document.getElementById('ed-email').value.trim() || s.email;
+  s.phone      = document.getElementById('ed-phone').value.trim();
+  s.date_of_birth = document.getElementById('ed-dob').value;
+  s.start_date    = document.getElementById('ed-start').value;
+  s.address       = document.getElementById('ed-addr').value.trim();
+  s.payment_method = document.getElementById('ed-method').value;
+  s.plan_id = document.getElementById('ed-plan').value || null;
+  s.groups = MOCK_DB.axes.map(ax => document.getElementById('ed-grp-' + ax.id)?.value).filter(Boolean);
+  closePanel('edit-panel');
+  Utils.toast('Alumno actualizado', `${s.first_name} ${s.last_name} fue actualizado correctamente.`, 'success');
+  renderPage();
 }
 
 function openPayModal(userId) {
@@ -418,14 +544,16 @@ function openPayModal(userId) {
   const debt = DB.getStudentDebt(userId);
   document.getElementById('pay-modal-title').textContent = `Registrar pago — ${s.first_name} ${s.last_name}`;
   document.getElementById('pay-modal-body').innerHTML = `
-    <p style="color:var(--color-text-muted);margin-bottom:var(--space-4)">Deuda pendiente: <strong style="color:var(--color-danger)">${Utils.formatCurrency(debt)}</strong></p>
+    ${debt > 0
+      ? `<div class="alert alert-warning" style="margin-bottom:var(--space-4)"><span class="alert-icon">⚠️</span><div>Deuda pendiente: <strong>${Utils.formatCurrency(debt)}</strong></div></div>`
+      : `<div class="alert alert-primary" style="margin-bottom:var(--space-4)"><span class="alert-icon">💡</span><div>El alumno está al corriente. Este pago se registrará como <strong>adelanto</strong>.</div></div>`}
     <div class="form-group">
       <label class="label">Concepto</label>
-      <input type="text" id="pm-desc" class="input" value="Pago mensualidad" />
+      <input type="text" id="pm-desc" class="input" value="${debt > 0 ? 'Pago mensualidad' : 'Pago adelantado'}" />
     </div>
     <div class="form-group">
       <label class="label">Monto</label>
-      <input type="number" id="pm-amount" class="input" value="${debt}" min="1">
+      <input type="number" id="pm-amount" class="input" value="${debt > 0 ? debt : ''}" placeholder="0.00" min="1">
     </div>
     <div class="form-group">
       <label class="label">Método de pago</label>
@@ -440,8 +568,7 @@ function openPayModal(userId) {
       <button class="btn btn-primary" style="flex:1" onclick="processManualPayment('${userId}')">Registrar pago</button>
     </div>
   `;
-  document.getElementById('pay-modal-backdrop').style.display = 'block';
-  document.getElementById('pay-modal').style.display = 'flex';
+  document.getElementById('pay-modal').classList.add('open');
 }
 
 function processManualPayment(userId) {
@@ -459,37 +586,6 @@ function processManualPayment(userId) {
   DB.addTransaction({ student_id: userId, type:'income', category:'enrollment', description: desc, amount, status:'succeeded', payment_method: method, created_at: new Date().toISOString() });
   closeModal('pay-modal');
   Utils.toast('Pago registrado', `${Utils.formatCurrency(amount)} registrado para ${s.first_name}`, 'success');
-  renderPage();
-}
-
-function openCatModal(userId) {
-  const s = DB.getUser(userId);
-  document.getElementById('pay-modal-title').textContent = `Categoría — ${s.first_name} ${s.last_name}`;
-  document.getElementById('pay-modal-body').innerHTML = `
-    <p style="color:var(--color-text-muted);margin-bottom:var(--space-4)">Selecciona la categoría de suscripción del alumno.</p>
-    <div class="form-group">
-      <label class="label">Categoría</label>
-      <select id="cat-select" class="input select">
-        <option value="">Sin categoría</option>
-        ${MOCK_DB.categories.map(c => `<option value="${c.id}" ${s.categories.includes(c.id)?'selected':''}>${c.name} — ${Utils.formatCurrency(c.monthly_fee)}/mes</option>`).join('')}
-      </select>
-    </div>
-    <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5)">
-      <button class="btn btn-outline" style="flex:1" onclick="closeModal('pay-modal')">Cancelar</button>
-      <button class="btn btn-primary" style="flex:1" onclick="saveCategory('${userId}')">Guardar</button>
-    </div>
-  `;
-  closePanel('view-panel');
-  document.getElementById('pay-modal-backdrop').style.display = 'block';
-  document.getElementById('pay-modal').style.display = 'flex';
-}
-
-function saveCategory(userId) {
-  const s = DB.getUser(userId);
-  const catId = document.getElementById('cat-select').value;
-  s.categories = catId ? [catId] : [];
-  closeModal('pay-modal');
-  Utils.toast('Categoría actualizada', `Categoría de ${s.first_name} actualizada`, 'success');
   renderPage();
 }
 

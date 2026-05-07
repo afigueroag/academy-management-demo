@@ -25,8 +25,7 @@ const main = document.getElementById('app-main');
    ---------------------------------------------------------------- */
 function getNavItems(role) {
   const base = [
-    { id:'account',   icon:'👤', label:'Mi cuenta' },
-    { id:'notifications', icon:'🔔', label:'Notificaciones' }
+    { id:'account',   icon:'👤', label:'Mi cuenta' }
   ];
   if (role === 'admin') {
     return [
@@ -81,7 +80,6 @@ function showSection(sectionId) {
   const el = document.getElementById('settings-content');
   switch(sectionId) {
     case 'account':       el.innerHTML = buildAccount(); initAccount(); break;
-    case 'notifications': el.innerHTML = buildNotifications(); initNotifications(); break;
     case 'academy':       el.innerHTML = buildAcademy(); initAcademy(); break;
     case 'categories':    el.innerHTML = buildCategories(); break;
     case 'branding':      el.innerHTML = buildBranding(); initBranding(); break;
@@ -149,37 +147,7 @@ function buildAccount() {
     </div>
   </div>
 
-  <!-- Change password -->
-  <div class="card" style="margin-top:var(--space-4)">
-    <div class="card-header"><h3>Cambiar contraseña</h3></div>
-    <div class="card-body">
-      <form onsubmit="changePassword(event)" style="max-width:420px">
-        <div class="form-group">
-          <label class="label">Contraseña actual</label>
-          <div class="input-group">
-            <span class="input-group-icon">🔒</span>
-            <input type="password" class="input input-with-suffix" id="pass-current" placeholder="••••••••">
-            <button type="button" class="input-group-suffix" onclick="togglePF('pass-current')">👁️</button>
-          </div>
-          <div class="form-hint">En el demo, escribe cualquier cosa.</div>
-        </div>
-        <div class="form-group">
-          <label class="label">Nueva contraseña</label>
-          <div class="input-group">
-            <span class="input-group-icon">🔒</span>
-            <input type="password" class="input input-with-suffix" id="pass-new" placeholder="Mínimo 8 caracteres" minlength="8">
-            <button type="button" class="input-group-suffix" onclick="togglePF('pass-new')">👁️</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="label">Confirmar nueva contraseña</label>
-          <input type="password" class="input" id="pass-confirm" placeholder="Repite la nueva contraseña">
-          <div class="form-error" id="err-pass-confirm">Las contraseñas no coinciden</div>
-        </div>
-        <button type="submit" class="btn btn-outline-primary">Actualizar contraseña</button>
-      </form>
-    </div>
-  </div>`;
+  `;
 }
 
 function initAccount() {
@@ -196,78 +164,6 @@ function saveProfile(e) {
   Utils.toast('Datos actualizados', 'Tu perfil fue guardado correctamente.', 'success');
 }
 
-function changePassword(e) {
-  e.preventDefault();
-  const np = document.getElementById('pass-new').value;
-  const nc = document.getElementById('pass-confirm').value;
-  const err = document.getElementById('err-pass-confirm');
-  if (np !== nc) { err.classList.add('visible'); return; }
-  err.classList.remove('visible');
-  e.target.reset();
-  Utils.toast('Contraseña actualizada', 'Tu contraseña fue cambiada correctamente.', 'success');
-}
-
-function togglePF(id) {
-  const el = document.getElementById(id);
-  el.type = el.type === 'password' ? 'text' : 'password';
-}
-
-/* ---- NOTIFICATIONS ---- */
-function buildNotifications() {
-  const config = MOCK_DB.notifications_config[user.id] || {};
-  const options = [
-    { key:'upcoming_payments', label:'Recordatorios de pago próximo', desc:'Recibe un aviso 3 días antes de que venza un pago.' },
-    { key:'new_enrollments', label:'Confirmación de inscripción', desc:'Email al inscribirte o cancelar una clase.' },
-    { key:'attendance_reminders', label:'Recordatorios de asistencia', desc:'Aviso el día de tu clase.' },
-    { key:'waitlist_promotions', label:'Promoción de lista de espera', desc:'Aviso cuando se libere un lugar en una clase que esperas.' },
-    { key:'invoice_generated', label:'Facturas generadas', desc:'Recibe tu factura al realizarse un cobro.' }
-  ];
-
-  return `
-  <div class="card">
-    <div class="card-header">
-      <h3>Notificaciones por correo</h3>
-      <span style="font-size:var(--font-size-xs);color:var(--color-text-secondary)">${user.email}</span>
-    </div>
-    <div class="card-body">
-      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
-        ${options.map(opt => `
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--color-border);border-radius:var(--radius-lg)">
-          <div>
-            <div style="font-weight:500;font-size:var(--font-size-sm)">${opt.label}</div>
-            <div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-top:2px">${opt.desc}</div>
-          </div>
-          <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
-            <input type="checkbox" ${config[opt.key]!==false?'checked':''} id="notif-${opt.key}" style="opacity:0;width:0;height:0" onchange="saveNotif()">
-            <span onclick="document.getElementById('notif-${opt.key}').click()" style="cursor:pointer;position:absolute;inset:0;background:${config[opt.key]!==false?'var(--color-primary)':'var(--color-gray-300)'};border-radius:var(--radius-full);transition:background 0.2s" id="toggle-${opt.key}">
-              <span style="position:absolute;top:3px;left:${config[opt.key]!==false?'23':'3'}px;width:18px;height:18px;background:white;border-radius:50%;transition:left 0.2s" id="toggle-knob-${opt.key}"></span>
-            </span>
-          </label>
-        </div>`).join('')}
-      </div>
-      <div style="margin-top:var(--space-4);text-align:right">
-        <button class="btn btn-primary" onclick="saveNotif(true)">Guardar preferencias</button>
-      </div>
-    </div>
-  </div>`;
-}
-
-function initNotifications() {}
-
-function saveNotif(showToast) {
-  if (!MOCK_DB.notifications_config[user.id]) MOCK_DB.notifications_config[user.id] = {};
-  const cfg = MOCK_DB.notifications_config[user.id];
-  ['upcoming_payments','new_enrollments','attendance_reminders','waitlist_promotions','invoice_generated'].forEach(key => {
-    const el = document.getElementById('notif-' + key);
-    if (!el) return;
-    cfg[key] = el.checked;
-    const toggle = document.getElementById('toggle-' + key);
-    const knob = document.getElementById('toggle-knob-' + key);
-    if (toggle) toggle.style.background = el.checked ? 'var(--color-primary)' : 'var(--color-gray-300)';
-    if (knob) knob.style.left = el.checked ? '23px' : '3px';
-  });
-  if (showToast) Utils.toast('Preferencias guardadas', 'Tus preferencias de notificación fueron actualizadas.', 'success');
-}
 
 /* ---- ACADEMY (Admin) ---- */
 function buildAcademy() {

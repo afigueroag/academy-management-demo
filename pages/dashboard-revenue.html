@@ -29,7 +29,7 @@ function getRevenueByCategory() {
     .forEach(t => {
       if (!t.student_id) { result['other'] += t.amount; return; }
       const student = DB.getUser(t.student_id);
-      if (!student || !student.categories.length) { result['other'] += t.amount; return; }
+      if (!student || !(student.categories||[]).length) { result['other'] += t.amount; return; }
       const catId = student.categories[0];
       if (result[catId] !== undefined) result[catId] += t.amount;
       else result['other'] += t.amount;
@@ -51,7 +51,7 @@ function getMonthlyRevenueByCat() {
         new Date(t.created_at).getFullYear() === target.getFullYear())
       .forEach(t => {
         const student = t.student_id ? DB.getUser(t.student_id) : null;
-        const catId = student && student.categories.length ? student.categories[0] : 'other';
+        const catId = student && (student.categories||[]).length ? student.categories[0] : 'other';
         if (catData[catId] !== undefined) catData[catId] += t.amount;
         else catData['other'] += t.amount;
       });
