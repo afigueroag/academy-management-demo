@@ -136,7 +136,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Invitar instructor -->
-    <div class="side-panel-backdrop" id="invite-backdrop" onclick="closePanel('invite-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="invite-backdrop" onclick="closePanel('invite-panel')"></div>
     <div class="side-panel" id="invite-panel">
       <div class="side-panel-header">
         <h3>Invitar instructor</h3>
@@ -160,7 +160,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Crear instructor -->
-    <div class="side-panel-backdrop" id="create-backdrop" onclick="closePanel('create-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="create-backdrop" onclick="closePanel('create-panel')"></div>
     <div class="side-panel" id="create-panel">
       <div class="side-panel-header">
         <h3>Agregar instructor</h3>
@@ -198,7 +198,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Ver instructor -->
-    <div class="side-panel-backdrop" id="view-backdrop" onclick="closePanel('view-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="view-backdrop" onclick="closePanel('view-panel')"></div>
     <div class="side-panel" id="view-panel" style="width:480px">
       <div class="side-panel-header">
         <h3 id="view-panel-title">Instructor</h3>
@@ -220,18 +220,18 @@ function renderPage() {
 }
 
 function openInvitePanel() {
-  document.getElementById('invite-backdrop').style.display = 'block';
+  document.getElementById('invite-backdrop').classList.add('open');
   document.getElementById('invite-panel').classList.add('open');
 }
 function openCreatePanel() {
-  document.getElementById('create-backdrop').style.display = 'block';
+  document.getElementById('create-backdrop').classList.add('open');
   document.getElementById('create-panel').classList.add('open');
 }
 function closePanel(id) {
   document.getElementById(id).classList.remove('open');
   const bd = id.replace('-panel','-backdrop');
   const el = document.getElementById(bd);
-  if (el) el.style.display = 'none';
+  if (el) el.classList.remove('open');
 }
 function closeModal(id) {
   document.getElementById(id).style.display = 'none';
@@ -341,7 +341,7 @@ function openViewPanel(instId) {
       <button class="btn btn-primary" onclick="openPayrollModal('${instId}');closePanel('view-panel')">Registrar nómina</button>
     </div>
   `;
-  document.getElementById('view-backdrop').style.display = 'block';
+  document.getElementById('view-backdrop').classList.add('open');
   document.getElementById('view-panel').classList.add('open');
 }
 
@@ -377,7 +377,7 @@ function openPayrollModal(instId) {
     </div>
     <div class="form-group">
       <label class="label">Método de pago</label>
-      <select id="pr-method" class="select">
+      <select id="pr-method" class="input select">
         <option value="transfer">Transferencia bancaria</option>
         <option value="cash">Efectivo</option>
         <option value="check">Cheque</option>

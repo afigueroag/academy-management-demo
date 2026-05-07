@@ -114,16 +114,16 @@ function renderPage() {
           <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
           <input type="text" class="search-field" placeholder="Buscar por nombre, email o teléfono…" oninput="state.search=this.value;renderTable()" value="${state.search}">
         </div>
-        <select class="select" style="width:auto" onchange="state.filterStatus=this.value;renderTable()">
+        <select class="input select" style="width:auto" onchange="state.filterStatus=this.value;renderTable()">
           <option value="active" ${state.filterStatus==='active'?'selected':''}>Activos</option>
           <option value="inactive" ${state.filterStatus==='inactive'?'selected':''}>Inactivos</option>
           <option value="all" ${state.filterStatus==='all'?'selected':''}>Todos</option>
         </select>
-        <select class="select" style="width:auto" onchange="state.filterCategory=this.value;renderTable()">
+        <select class="input select" style="width:auto" onchange="state.filterCategory=this.value;renderTable()">
           <option value="">Todas las categorías</option>
           ${MOCK_DB.categories.map(c => `<option value="${c.id}" ${state.filterCategory===c.id?'selected':''}>${c.name}</option>`).join('')}
         </select>
-        <select class="select" style="width:auto" onchange="state.filterDebt=this.value;renderTable()">
+        <select class="input select" style="width:auto" onchange="state.filterDebt=this.value;renderTable()">
           <option value="">Cualquier deuda</option>
           <option value="yes" ${state.filterDebt==='yes'?'selected':''}>Con deuda</option>
           <option value="no" ${state.filterDebt==='no'?'selected':''}>Sin deuda</option>
@@ -133,7 +133,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Invitar -->
-    <div class="side-panel-backdrop" id="invite-backdrop" onclick="closePanel('invite-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="invite-backdrop" onclick="closePanel('invite-panel')"></div>
     <div class="side-panel" id="invite-panel">
       <div class="side-panel-header">
         <h3>Invitar alumno</h3>
@@ -151,7 +151,7 @@ function renderPage() {
         </div>
         <div class="form-group">
           <label class="label">Categoría de suscripción</label>
-          <select id="inv-cat" class="select">
+          <select id="inv-cat" class="input select">
             <option value="">Sin asignar</option>
             ${MOCK_DB.categories.map(c => `<option value="${c.id}">${c.name} — ${Utils.formatCurrency(c.monthly_fee)}/mes</option>`).join('')}
           </select>
@@ -165,7 +165,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Crear alumno -->
-    <div class="side-panel-backdrop" id="create-backdrop" onclick="closePanel('create-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="create-backdrop" onclick="closePanel('create-panel')"></div>
     <div class="side-panel" id="create-panel">
       <div class="side-panel-header">
         <h3>Crear alumno</h3>
@@ -196,7 +196,7 @@ function renderPage() {
         </div>
         <div class="form-group">
           <label class="label">Categoría de suscripción</label>
-          <select id="cr-cat" class="select">
+          <select id="cr-cat" class="input select">
             <option value="">Sin asignar</option>
             ${MOCK_DB.categories.map(c => `<option value="${c.id}">${c.name} — ${Utils.formatCurrency(c.monthly_fee)}/mes</option>`).join('')}
           </select>
@@ -210,7 +210,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Ver/editar alumno -->
-    <div class="side-panel-backdrop" id="view-backdrop" onclick="closePanel('view-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="view-backdrop" onclick="closePanel('view-panel')"></div>
     <div class="side-panel" id="view-panel" style="width:480px">
       <div class="side-panel-header">
         <h3 id="view-panel-title">Alumno</h3>
@@ -299,11 +299,11 @@ function renderTable() {
 }
 
 function openInvitePanel() {
-  document.getElementById('invite-backdrop').style.display = 'block';
+  document.getElementById('invite-backdrop').classList.add('open');
   document.getElementById('invite-panel').classList.add('open');
 }
 function openCreatePanel() {
-  document.getElementById('create-backdrop').style.display = 'block';
+  document.getElementById('create-backdrop').classList.add('open');
   document.getElementById('create-panel').classList.add('open');
 }
 
@@ -311,7 +311,7 @@ function closePanel(id) {
   document.getElementById(id).classList.remove('open');
   const bd = id.replace('-panel','-backdrop');
   const el = document.getElementById(bd);
-  if (el) el.style.display = 'none';
+  if (el) el.classList.remove('open');
 }
 function closeModal(id) {
   document.getElementById(id).style.display = 'none';
@@ -409,7 +409,7 @@ function openViewPanel(userId) {
       <button class="btn ${s.is_active?'btn-danger':'btn-success'}" onclick="toggleStudent('${s.id}',${!s.is_active});closePanel('view-panel')">${s.is_active?'Desactivar alumno':'Activar alumno'}</button>
     </div>
   `;
-  document.getElementById('view-backdrop').style.display = 'block';
+  document.getElementById('view-backdrop').classList.add('open');
   document.getElementById('view-panel').classList.add('open');
 }
 
@@ -429,7 +429,7 @@ function openPayModal(userId) {
     </div>
     <div class="form-group">
       <label class="label">Método de pago</label>
-      <select id="pm-method" class="select">
+      <select id="pm-method" class="input select">
         <option value="cash">Efectivo</option>
         <option value="transfer">Transferencia</option>
         <option value="card">Tarjeta</option>
@@ -469,7 +469,7 @@ function openCatModal(userId) {
     <p style="color:var(--color-text-muted);margin-bottom:var(--space-4)">Selecciona la categoría de suscripción del alumno.</p>
     <div class="form-group">
       <label class="label">Categoría</label>
-      <select id="cat-select" class="select">
+      <select id="cat-select" class="input select">
         <option value="">Sin categoría</option>
         ${MOCK_DB.categories.map(c => `<option value="${c.id}" ${s.categories.includes(c.id)?'selected':''}>${c.name} — ${Utils.formatCurrency(c.monthly_fee)}/mes</option>`).join('')}
       </select>

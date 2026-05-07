@@ -103,13 +103,13 @@ function renderPage() {
           <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
           <input type="text" class="search-field" placeholder="Buscar por alumno o concepto…" oninput="state.search=this.value;renderTable()" value="${state.search}">
         </div>
-        <select class="select" style="width:auto" onchange="state.filterType=this.value;renderTable()">
+        <select class="input select" style="width:auto" onchange="state.filterType=this.value;renderTable()">
           <option value="income" ${state.filterType==='income'?'selected':''}>Ingresos</option>
           <option value="expense" ${state.filterType==='expense'?'selected':''}>Gastos</option>
           <option value="payroll" ${state.filterType==='payroll'?'selected':''}>Nómina</option>
           <option value="" ${state.filterType===''?'selected':''}>Todos</option>
         </select>
-        <select class="select" style="width:auto" onchange="state.filterStatus=this.value;renderTable()">
+        <select class="input select" style="width:auto" onchange="state.filterStatus=this.value;renderTable()">
           <option value="">Todos los estados</option>
           <option value="succeeded" ${state.filterStatus==='succeeded'?'selected':''}>Pagado</option>
           <option value="pending" ${state.filterStatus==='pending'?'selected':''}>Pendiente</option>
@@ -132,14 +132,14 @@ function renderPage() {
       <div style="padding:var(--space-5)">
         <div class="form-group">
           <label class="label">Alumno</label>
-          <select id="np-student" class="select">
+          <select id="np-student" class="input select">
             <option value="">Seleccionar alumno…</option>
             ${MOCK_DB.users.filter(u=>u.role==='student'&&u.is_active).map(s => `<option value="${s.id}">${s.first_name} ${s.last_name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label class="label">Concepto</label>
-          <select id="np-concept" class="select">
+          <select id="np-concept" class="input select">
             <option value="Mensualidad">Mensualidad</option>
             <option value="Inscripción">Inscripción</option>
             <option value="Pago por clase">Pago por clase</option>
@@ -156,7 +156,7 @@ function renderPage() {
         </div>
         <div class="form-group">
           <label class="label">Método de pago</label>
-          <select id="np-method" class="select">
+          <select id="np-method" class="input select">
             <option value="cash">Efectivo</option>
             <option value="transfer">Transferencia</option>
             <option value="card">Tarjeta</option>
@@ -170,7 +170,7 @@ function renderPage() {
     </div>
 
     <!-- Panel: Ver transacción -->
-    <div class="side-panel-backdrop" id="txn-backdrop" onclick="closePanel('txn-panel')" style="display:none"></div>
+    <div class="side-panel-backdrop" id="txn-backdrop" onclick="closePanel('txn-panel')"></div>
     <div class="side-panel" id="txn-panel">
       <div class="side-panel-header">
         <h3 id="txn-panel-title">Transacción</h3>
@@ -256,7 +256,7 @@ function closePanel(id) {
   document.getElementById(id).classList.remove('open');
   const bd = id.replace('-panel','-backdrop');
   const el = document.getElementById(bd);
-  if (el) el.style.display = 'none';
+  if (el) el.classList.remove('open');
 }
 
 function openNewPaymentModal() {
@@ -329,7 +329,7 @@ function openTxnPanel(txnId) {
       ${t.status === 'pending' ? `<button class="btn btn-success" onclick="markPaid('${t.id}');closePanel('txn-panel')">✓ Marcar como pagado</button>` : ''}
     </div>
   `;
-  document.getElementById('txn-backdrop').style.display = 'block';
+  document.getElementById('txn-backdrop').classList.add('open');
   document.getElementById('txn-panel').classList.add('open');
 }
 
