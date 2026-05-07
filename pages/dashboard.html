@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Financiero — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Dashboard', 'dashboard');
+
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function getMonthlyData() {
+  const now = new Date();
+  const data = [];
+  for (let m = 5; m >= 0; m--) {
+    const target = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    const txns = MOCK_DB.transactions.filter(t => {
+      const d = new Date(t.created_at);
+      return d.getMonth() === target.getMonth() && d.getFullYear() === target.getFullYear();
+    });
+    data.push({
+      label: MONTHS[target.getMonth()],
+      income: txns.filter(t => t.type==='income' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0),
+      expense: txns.filter(t => t.type==='expense' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0),
+      payroll: txns.filter(t => t.type==='payroll' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0)
+    });
+  }
+  return data;
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const now = new Date();
+  const monthly = getMonthlyData();
+  const current = monthly[monthly.length - 1];
+  const totalRevenue = MOCK_DB.transactions.filter(t => t.type==='income' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0);
+  const totalExpense = MOCK_DB.transactions.filter(t => t.type==='expense' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0);
+  const totalPayroll = MOCK_DB.transactions.filter(t => t.type==='payroll' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0);
+  const netIncome = totalRevenue - totalExpense - totalPayroll;
+  const recentTxns = MOCK_DB.transactions
+    .filter(t => t.type === 'income')
+    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 8);
+
+  main.innerHTML = `
+    <!-- Tabs de navegación del dashboard -->
+    <div style="margin-bottom:var(--space-6)">
+      <h1 class="page-title" style="margin-bottom:var(--space-4)">Dashboard financiero</h1>
+      <div style="display:flex;gap:var(--space-1);border-bottom:2px solid var(--color-border);margin-bottom:var(--space-6)">
+        <a href="dashboard.html" class="tab tab-active">Resumen</a>
+        <a href="dashboard-revenue.html" class="tab">Ingresos</a>
+        <a href="dashboard-expenses.html" class="tab">Gastos</a>
+        <a href="dashboard-pl.html" class="tab">P&L</a>
+        <a href="dashboard-payroll.html" class="tab">Nómina</a>
+      </div>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Ingresos totales</span><span style="font-size:1.5rem">💰</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalRevenue)}</div>
+        <div class="scorecard-trend trend-up">este mes: ${Utils.formatCurrency(current.income)}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Gastos operativos</span><span style="font-size:1.5rem">📋</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalExpense)}</div>
+        <div class="scorecard-trend trend-down">este mes: ${Utils.formatCurrency(current.expense)}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Nómina</span><span style="font-size:1.5rem">👥</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalPayroll)}</div>
+        <div class="scorecard-trend trend-down">este mes: ${Utils.formatCurrency(current.payroll)}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Ingreso neto</span><span style="font-size:1.5rem">📈</span></div>
+        <div class="scorecard-value" style="color:${netIncome>=0?'var(--color-success)':'var(--color-danger)'}">${Utils.formatCurrency(Math.abs(netIncome))}</div>
+        <div class="scorecard-trend ${netIncome>=0?'trend-up':'trend-down'}">${netIncome>=0?'ganancia':'pérdida'}</div>
+      </div>
+    </div>
+
+    <div class="content-cols" style="margin-bottom:var(--space-6)">
+      <div class="card" style="padding:var(--space-5)">
+        <h3 style="margin-bottom:var(--space-4)">Ingresos vs Gastos — últimos 6 meses</h3>
+        <div style="position:relative;height:280px">
+          <canvas id="overview-chart"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:var(--space-5)">
+        <h3 style="margin-bottom:var(--space-4)">Distribución este mes</h3>
+        <div style="position:relative;height:200px">
+          <canvas id="dist-chart"></canvas>
+        </div>
+        <div style="margin-top:var(--space-4)">
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+            <span style="display:flex;align-items:center;gap:var(--space-2)"><span style="width:12px;height:12px;border-radius:2px;background:#6366f1;display:inline-block"></span>Ingresos</span>
+            <strong>${Utils.formatCurrency(current.income)}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+            <span style="display:flex;align-items:center;gap:var(--space-2)"><span style="width:12px;height:12px;border-radius:2px;background:#ef4444;display:inline-block"></span>Gastos</span>
+            <strong>${Utils.formatCurrency(current.expense)}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0">
+            <span style="display:flex;align-items:center;gap:var(--space-2)"><span style="width:12px;height:12px;border-radius:2px;background:#f59e0b;display:inline-block"></span>Nómina</span>
+            <strong>${Utils.formatCurrency(current.payroll)}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <h3 style="margin-bottom:var(--space-4)">Últimos pagos recibidos</h3>
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr><th>Fecha</th><th>Alumno</th><th>Concepto</th><th>Monto</th><th>Estado</th></tr></thead>
+          <tbody>
+            ${recentTxns.map(t => {
+              const student = t.student_id ? DB.getUser(t.student_id) : null;
+              return `<tr>
+                <td style="color:var(--color-text-muted);font-size:var(--text-sm)">${Utils.formatDate(t.created_at)}</td>
+                <td>${student ? `<div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(student,28)}<span style="font-size:var(--text-sm)">${student.first_name} ${student.last_name}</span></div>` : '—'}</td>
+                <td style="font-size:var(--text-sm)">${t.description}</td>
+                <td style="font-weight:600">${Utils.formatCurrency(t.amount)}</td>
+                <td><span class="badge ${t.status==='succeeded'?'badge-success':t.status==='pending'?'badge-warning':'badge-default'}">${t.status==='succeeded'?'Pagado':t.status==='pending'?'Pendiente':'Otro'}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Overview bar chart
+  const ctx1 = document.getElementById('overview-chart').getContext('2d');
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: monthly.map(m => m.label),
+      datasets: [
+        { label:'Ingresos', data: monthly.map(m => m.income), backgroundColor:'rgba(99,102,241,0.8)', borderRadius:4 },
+        { label:'Gastos', data: monthly.map(m => m.expense + m.payroll), backgroundColor:'rgba(239,68,68,0.7)', borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom' } },
+      scales:{ y:{ beginAtZero:true, ticks:{ callback: v => '$'+v.toLocaleString() } } }
+    }
+  });
+
+  // Distribution doughnut
+  const ctx2 = document.getElementById('dist-chart').getContext('2d');
+  new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: ['Ingresos','Gastos','Nómina'],
+      datasets: [{ data:[current.income, current.expense, current.payroll], backgroundColor:['#6366f1','#ef4444','#f59e0b'], borderWidth:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+  });
+}
+
+renderPage();
+</script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nómina — Dashboard</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Dashboard', 'dashboard');
+
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function getInstructors() {
+  return MOCK_DB.users.filter(u => u.role === 'instructor');
+}
+
+function getPayrollByInstructor() {
+  const result = {};
+  getInstructors().forEach(i => { result[i.id] = { paid:0, pending:0, name:`${i.first_name} ${i.last_name}` }; });
+  MOCK_DB.transactions.filter(t => t.type === 'payroll' && t.instructor_id).forEach(t => {
+    if (!result[t.instructor_id]) result[t.instructor_id] = { paid:0, pending:0, name:t.instructor_id };
+    if (t.status === 'succeeded') result[t.instructor_id].paid += t.amount;
+    else if (t.status === 'pending') result[t.instructor_id].pending += t.amount;
+  });
+  return result;
+}
+
+function getMonthlyPayroll() {
+  const now = new Date();
+  const instructors = getInstructors();
+  return Array.from({length:6}, (_,i) => {
+    const target = new Date(now.getFullYear(), now.getMonth()-(5-i), 1);
+    const txns = MOCK_DB.transactions.filter(t => {
+      const d = new Date(t.created_at);
+      return t.type==='payroll' && t.status==='succeeded' && d.getMonth()===target.getMonth() && d.getFullYear()===target.getFullYear();
+    });
+    const instData = {};
+    instructors.forEach(inst => { instData[inst.id] = 0; });
+    txns.forEach(t => { if (t.instructor_id && instData[t.instructor_id]!==undefined) instData[t.instructor_id] += t.amount; });
+    return { label: MONTHS[target.getMonth()], total: txns.reduce((s,t)=>s+t.amount,0), ...instData };
+  });
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const instructors = getInstructors();
+  const payrollByInst = getPayrollByInstructor();
+  const monthly = getMonthlyPayroll();
+  const now = new Date();
+  const totalPaid = Object.values(payrollByInst).reduce((s,v) => s+v.paid, 0);
+  const totalPending = Object.values(payrollByInst).reduce((s,v) => s+v.pending, 0);
+  const monthPayroll = monthly[monthly.length-1].total;
+  const avgMonthly = Math.round(monthly.reduce((s,m)=>s+m.total,0)/6);
+
+  const instColors = ['#6366f1','#8b5cf6','#06b6d4','#22c55e','#f59e0b','#ef4444'];
+
+  main.innerHTML = `
+    <div style="margin-bottom:var(--space-6)">
+      <h1 class="page-title" style="margin-bottom:var(--space-4)">Dashboard financiero</h1>
+      <div style="display:flex;gap:var(--space-1);border-bottom:2px solid var(--color-border);margin-bottom:var(--space-6)">
+        <a href="dashboard.html" class="tab">Resumen</a>
+        <a href="dashboard-revenue.html" class="tab">Ingresos</a>
+        <a href="dashboard-expenses.html" class="tab">Gastos</a>
+        <a href="dashboard-pl.html" class="tab">P&L</a>
+        <a href="dashboard-payroll.html" class="tab tab-active">Nómina</a>
+      </div>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Total pagado</span><span style="font-size:1.5rem">✅</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalPaid)}</div>
+        <div class="scorecard-trend trend-up">nómina liquidada</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Pendiente de pago</span><span style="font-size:1.5rem">⏳</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalPending)}</div>
+        <div class="scorecard-trend ${totalPending>0?'trend-down':'trend-up'}">${totalPending>0?'por liquidar':'al corriente'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Nómina este mes</span><span style="font-size:1.5rem">📅</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(monthPayroll)}</div>
+        <div class="scorecard-trend trend-down">mayo 2026</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Promedio mensual</span><span style="font-size:1.5rem">📊</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(avgMonthly)}</div>
+        <div class="scorecard-trend trend-down">últimos 6 meses</div>
+      </div>
+    </div>
+
+    <div class="content-cols" style="margin-bottom:var(--space-6)">
+      <div class="card" style="padding:var(--space-5)">
+        <h3 style="margin-bottom:var(--space-4)">Nómina mensual por instructor</h3>
+        <div style="position:relative;height:280px">
+          <canvas id="payroll-bar-chart"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:var(--space-5)">
+        <h3 style="margin-bottom:var(--space-4)">Distribución por instructor</h3>
+        <div style="position:relative;height:220px">
+          <canvas id="payroll-doughnut"></canvas>
+        </div>
+        <div style="margin-top:var(--space-4)">
+          ${instructors.map((inst, idx) => {
+            const data = payrollByInst[inst.id];
+            const color = instColors[idx % instColors.length];
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+                <span style="display:flex;align-items:center;gap:var(--space-2)">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block"></span>
+                  ${inst.first_name} ${inst.last_name}
+                </span>
+                <div style="text-align:right">
+                  <div style="font-weight:600;color:var(--color-success)">${Utils.formatCurrency(data?.paid||0)}</div>
+                  ${data?.pending>0?`<div style="font-size:var(--text-xs);color:var(--color-warning)">${Utils.formatCurrency(data.pending)} pendiente</div>`:''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <h3 style="margin-bottom:var(--space-4)">Detalle por instructor</h3>
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr>
+            <th>Instructor</th>
+            <th>Tarifa/hora</th>
+            <th>Horas este mes</th>
+            <th>Salario esperado</th>
+            <th>Pagado</th>
+            <th>Pendiente</th>
+            <th>Estado</th>
+          </tr></thead>
+          <tbody>
+            ${instructors.map(inst => {
+              const hours = DB.getInstructorHours(inst.id);
+              const expected = inst.hourly_rate ? hours * inst.hourly_rate : 0;
+              const data = payrollByInst[inst.id];
+              const paid = data?.paid || 0;
+              const pending = data?.pending || 0;
+              const status = pending > 0 ? 'pending' : paid > 0 ? 'paid' : 'none';
+              return `<tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:var(--space-3)">
+                    ${Utils.avatarHtml(inst, 32)}
+                    <span style="font-weight:500">${inst.first_name} ${inst.last_name}</span>
+                  </div>
+                </td>
+                <td>${inst.hourly_rate ? Utils.formatCurrency(inst.hourly_rate)+'/hr' : '—'}</td>
+                <td><strong>${hours}</strong> hrs</td>
+                <td>${Utils.formatCurrency(expected)}</td>
+                <td style="color:var(--color-success);font-weight:600">${paid>0?Utils.formatCurrency(paid):'—'}</td>
+                <td style="color:${pending>0?'var(--color-danger)':'var(--color-text-muted)'};font-weight:${pending>0?'600':'400'}">${pending>0?Utils.formatCurrency(pending):'—'}</td>
+                <td>
+                  <span class="badge ${status==='pending'?'badge-warning':status==='paid'?'badge-success':'badge-default'}">
+                    ${status==='pending'?'Pendiente':status==='paid'?'Al corriente':'Sin registros'}
+                  </span>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:var(--space-5)">
+        <h4 style="margin-bottom:var(--space-3)">Historial de pagos de nómina</h4>
+        ${(() => {
+          const payrollTxns = MOCK_DB.transactions.filter(t => t.type==='payroll').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,10);
+          if (!payrollTxns.length) return '<p style="color:var(--color-text-muted)">Sin registros de nómina</p>';
+          return `<div class="table-responsive"><table class="table">
+            <thead><tr><th>Fecha</th><th>Instructor</th><th>Concepto</th><th>Monto</th><th>Estado</th></tr></thead>
+            <tbody>
+              ${payrollTxns.map(t => {
+                const inst = t.instructor_id ? DB.getUser(t.instructor_id) : null;
+                return `<tr>
+                  <td style="color:var(--color-text-muted);font-size:var(--text-sm)">${Utils.formatDate(t.created_at)}</td>
+                  <td>${inst?`${inst.first_name} ${inst.last_name}`:'—'}</td>
+                  <td style="font-size:var(--text-sm)">${t.description}</td>
+                  <td style="font-weight:600">${Utils.formatCurrency(t.amount)}</td>
+                  <td><span class="badge ${t.status==='succeeded'?'badge-success':t.status==='pending'?'badge-warning':'badge-default'}">${t.status==='succeeded'?'Pagado':'Pendiente'}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table></div>`;
+        })()}
+      </div>
+    </div>
+  `;
+
+  // Bar chart
+  const ctx1 = document.getElementById('payroll-bar-chart').getContext('2d');
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: monthly.map(m => m.label),
+      datasets: instructors.map((inst, idx) => ({
+        label: `${inst.first_name} ${inst.last_name.split(' ')[0]}`,
+        data: monthly.map(m => m[inst.id]||0),
+        backgroundColor: instColors[idx % instColors.length] + 'cc',
+        borderRadius: 2
+      }))
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom' } },
+      scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{ callback: v=>'$'+v.toLocaleString() } } }
+    }
+  });
+
+  // Doughnut
+  const ctx2 = document.getElementById('payroll-doughnut').getContext('2d');
+  new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: instructors.map(i => `${i.first_name} ${i.last_name.split(' ')[0]}`),
+      datasets: [{ data: instructors.map(i => (payrollByInst[i.id]?.paid||0)), backgroundColor: instructors.map((_,idx)=>instColors[idx%instColors.length]), borderWidth:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+  });
+}
+
+renderPage();
+</script>
+</body>
+</html>

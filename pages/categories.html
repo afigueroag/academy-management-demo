@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categorías — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Categorías', 'categories');
+
+let editingId = null;
+
+function getStudentsInCategory(catId) {
+  return MOCK_DB.users.filter(u => u.role === 'student' && u.is_active && u.categories.includes(catId)).length;
+}
+
+function getRevenueForCategory(catId) {
+  const cat = MOCK_DB.categories.find(c => c.id === catId);
+  if (!cat) return 0;
+  return getStudentsInCategory(catId) * cat.monthly_fee;
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const cats = MOCK_DB.categories;
+  const totalStudents = MOCK_DB.users.filter(u => u.role === 'student' && u.is_active).length;
+  const totalRevenue = cats.reduce((s, c) => s + getRevenueForCategory(c.id), 0);
+
+  main.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-6)">
+      <div>
+        <h1 class="page-title">Categorías de suscripción</h1>
+        <p style="color:var(--color-text-muted);margin-top:var(--space-1)">Define los planes de membresía y sus precios</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('cat-modal')">+ Nueva categoría</button>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Categorías activas</span><span style="font-size:1.5rem">🏷️</span></div>
+        <div class="scorecard-value">${cats.length}</div>
+        <div class="scorecard-trend trend-up">planes disponibles</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Alumnos suscritos</span><span style="font-size:1.5rem">👥</span></div>
+        <div class="scorecard-value">${totalStudents}</div>
+        <div class="scorecard-trend trend-up">con categoría asignada</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Ingreso mensual estimado</span><span style="font-size:1.5rem">💰</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalRevenue)}</div>
+        <div class="scorecard-trend trend-up">por suscripciones</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Precio promedio</span><span style="font-size:1.5rem">📊</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(cats.length ? Math.round(cats.reduce((s,c)=>s+c.monthly_fee,0)/cats.length) : 0)}</div>
+        <div class="scorecard-trend trend-up">por plan</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-5);margin-bottom:var(--space-6)">
+      ${cats.map(cat => {
+        const enrolled = getStudentsInCategory(cat.id);
+        const revenue = getRevenueForCategory(cat.id);
+        return `
+          <div class="card" style="padding:var(--space-5);position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;width:100%;height:4px;background:${cat.color}"></div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:var(--space-4)">
+              <div style="display:flex;align-items:center;gap:var(--space-3)">
+                <div style="width:40px;height:40px;border-radius:var(--radius-md);background:${cat.color};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:var(--text-lg)">${cat.name[0]}</div>
+                <div>
+                  <div style="font-weight:700;font-size:var(--text-lg)">${cat.name}</div>
+                  <div style="font-size:var(--text-xs);color:var(--color-text-muted)">cat_id: ${cat.id}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:var(--space-2)">
+                <button class="btn btn-ghost btn-icon" title="Editar" onclick="openEditModal('${cat.id}')">✏️</button>
+                <button class="btn btn-ghost btn-icon" title="Eliminar" onclick="deleteCategory('${cat.id}')" style="color:var(--color-danger)">🗑️</button>
+              </div>
+            </div>
+            <p style="color:var(--color-text-muted);font-size:var(--text-sm);margin-bottom:var(--space-4);min-height:40px">${cat.description}</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)">
+              <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
+                <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Mensualidad</div>
+                <div style="font-size:var(--text-xl);font-weight:700;color:${cat.color}">${Utils.formatCurrency(cat.monthly_fee)}</div>
+              </div>
+              <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
+                <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Inscripción</div>
+                <div style="font-size:var(--text-xl);font-weight:700">${Utils.formatCurrency(cat.enrollment_fee)}</div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:var(--space-3);border-top:1px solid var(--color-border)">
+              <div style="font-size:var(--text-sm);color:var(--color-text-muted)">
+                <strong style="color:var(--color-text)">${enrolled}</strong> alumno${enrolled!==1?'s':''}
+              </div>
+              <div style="font-size:var(--text-sm);font-weight:600;color:var(--color-success)">${Utils.formatCurrency(revenue)}/mes</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <h3 style="margin-bottom:var(--space-4)">Distribución de alumnos por categoría</h3>
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        ${cats.map(cat => {
+          const enrolled = getStudentsInCategory(cat.id);
+          const pct = totalStudents ? Math.round(enrolled/totalStudents*100) : 0;
+          return `
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-1)">
+                <span style="font-size:var(--text-sm);font-weight:500">${cat.name}</span>
+                <span style="font-size:var(--text-sm);color:var(--color-text-muted)">${enrolled} alumno${enrolled!==1?'s':''} (${pct}%)</span>
+              </div>
+              <div style="height:8px;background:var(--color-border);border-radius:4px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${cat.color};border-radius:4px;transition:width 0.3s"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Modal: Crear/editar categoría -->
+    <div class="modal-backdrop" id="cat-modal-backdrop" onclick="closeModal('cat-modal')" style="display:none"></div>
+    <div class="modal" id="cat-modal" style="display:none;max-width:480px">
+      <div class="modal-header">
+        <h3 id="cat-modal-title">Nueva categoría</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal('cat-modal')">✕</button>
+      </div>
+      <div style="padding:var(--space-5)">
+        <div class="form-group">
+          <label class="label">Nombre</label>
+          <input type="text" id="cat-name" class="input" placeholder="Ej: Premium, Básico, Intensivo…">
+        </div>
+        <div class="form-group">
+          <label class="label">Descripción</label>
+          <textarea id="cat-desc" class="input" rows="2" placeholder="Qué incluye este plan…"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="label">Mensualidad</label>
+            <input type="number" id="cat-fee" class="input" placeholder="500" min="0">
+          </div>
+          <div class="form-group">
+            <label class="label">Inscripción</label>
+            <input type="number" id="cat-enroll" class="input" placeholder="200" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="label">Color de la categoría</label>
+          <div style="display:flex;gap:var(--space-3);align-items:center">
+            <input type="color" id="cat-color" class="input" style="width:60px;height:40px;padding:4px;cursor:pointer" value="#6366f1">
+            <div id="cat-color-preview" style="flex:1;height:40px;border-radius:var(--radius-md);background:#6366f1;display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:var(--text-sm)">Vista previa</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5)">
+          <button class="btn btn-outline" style="flex:1" onclick="closeModal('cat-modal')">Cancelar</button>
+          <button class="btn btn-primary" style="flex:1" onclick="saveCategory()">Guardar categoría</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Confirmar eliminación -->
+    <div class="modal-backdrop" id="del-modal-backdrop" onclick="closeModal('del-modal')" style="display:none"></div>
+    <div class="modal" id="del-modal" style="display:none;max-width:400px">
+      <div class="modal-header">
+        <h3>Eliminar categoría</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal('del-modal')">✕</button>
+      </div>
+      <div style="padding:var(--space-5)">
+        <div id="del-modal-body"></div>
+        <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5)">
+          <button class="btn btn-outline" style="flex:1" onclick="closeModal('del-modal')">Cancelar</button>
+          <button class="btn btn-danger" style="flex:1" id="del-confirm-btn">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('cat-color').addEventListener('input', function() {
+    document.getElementById('cat-color-preview').style.background = this.value;
+  });
+}
+
+function openModal(id) {
+  document.getElementById(id+'-backdrop').style.display = 'block';
+  document.getElementById(id).style.display = 'flex';
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+  document.getElementById(id+'-backdrop').style.display = 'none';
+}
+
+function openEditModal(catId) {
+  const cat = MOCK_DB.categories.find(c => c.id === catId);
+  if (!cat) return;
+  editingId = catId;
+  document.getElementById('cat-modal-title').textContent = 'Editar categoría';
+  document.getElementById('cat-name').value = cat.name;
+  document.getElementById('cat-desc').value = cat.description;
+  document.getElementById('cat-fee').value = cat.monthly_fee;
+  document.getElementById('cat-enroll').value = cat.enrollment_fee;
+  document.getElementById('cat-color').value = cat.color;
+  document.getElementById('cat-color-preview').style.background = cat.color;
+  openModal('cat-modal');
+}
+
+function saveCategory() {
+  const name = document.getElementById('cat-name').value.trim();
+  const desc = document.getElementById('cat-desc').value.trim();
+  const fee = parseFloat(document.getElementById('cat-fee').value);
+  const enroll = parseFloat(document.getElementById('cat-enroll').value);
+  const color = document.getElementById('cat-color').value;
+  if (!name || isNaN(fee) || isNaN(enroll)) { Utils.toast('Error','Completa todos los campos requeridos','error'); return; }
+
+  if (editingId) {
+    const cat = MOCK_DB.categories.find(c => c.id === editingId);
+    if (cat) { cat.name = name; cat.description = desc; cat.monthly_fee = fee; cat.enrollment_fee = enroll; cat.color = color; }
+    Utils.toast('Categoría actualizada', `"${name}" ha sido actualizada`, 'success');
+  } else {
+    MOCK_DB.categories.push({ id:'cat_'+Date.now(), academy_id:'acad_001', name, description:desc, color, monthly_fee:fee, enrollment_fee:enroll, created_at:new Date().toISOString() });
+    Utils.toast('Categoría creada', `"${name}" ha sido creada`, 'success');
+  }
+  editingId = null;
+  closeModal('cat-modal');
+  renderPage();
+}
+
+function deleteCategory(catId) {
+  const cat = MOCK_DB.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const enrolled = getStudentsInCategory(catId);
+  document.getElementById('del-modal-body').innerHTML = `
+    <p>¿Estás seguro de eliminar la categoría <strong>"${cat.name}"</strong>?</p>
+    ${enrolled > 0 ? `<div class="alert alert-warning" style="margin-top:var(--space-3)">⚠️ ${enrolled} alumno${enrolled!==1?'s':''} tiene${enrolled!==1?'n':''} esta categoría asignada. Se les removerá la categoría.</div>` : ''}
+  `;
+  document.getElementById('del-confirm-btn').onclick = () => {
+    MOCK_DB.users.forEach(u => { u.categories = u.categories.filter(c => c !== catId); });
+    const idx = MOCK_DB.categories.findIndex(c => c.id === catId);
+    if (idx !== -1) MOCK_DB.categories.splice(idx, 1);
+    closeModal('del-modal');
+    Utils.toast('Categoría eliminada', `"${cat.name}" ha sido eliminada`, 'warning');
+    renderPage();
+  };
+  openModal('del-modal');
+}
+
+renderPage();
+</script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingresos — Dashboard</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Dashboard', 'dashboard');
+
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function getRevenueByCategory() {
+  const result = {};
+  MOCK_DB.categories.forEach(c => { result[c.id] = 0; });
+  result['other'] = 0;
+  MOCK_DB.transactions
+    .filter(t => t.type === 'income' && t.status === 'succeeded')
+    .forEach(t => {
+      if (!t.student_id) { result['other'] += t.amount; return; }
+      const student = DB.getUser(t.student_id);
+      if (!student || !student.categories.length) { result['other'] += t.amount; return; }
+      const catId = student.categories[0];
+      if (result[catId] !== undefined) result[catId] += t.amount;
+      else result['other'] += t.amount;
+    });
+  return result;
+}
+
+function getMonthlyRevenueByCat() {
+  const now = new Date();
+  const months = [];
+  for (let m = 5; m >= 0; m--) {
+    const target = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    const catData = {};
+    MOCK_DB.categories.forEach(c => { catData[c.id] = 0; });
+    catData['other'] = 0;
+    MOCK_DB.transactions
+      .filter(t => t.type === 'income' && t.status === 'succeeded' &&
+        new Date(t.created_at).getMonth() === target.getMonth() &&
+        new Date(t.created_at).getFullYear() === target.getFullYear())
+      .forEach(t => {
+        const student = t.student_id ? DB.getUser(t.student_id) : null;
+        const catId = student && student.categories.length ? student.categories[0] : 'other';
+        if (catData[catId] !== undefined) catData[catId] += t.amount;
+        else catData['other'] += t.amount;
+      });
+    months.push({ label: MONTHS[target.getMonth()], ...catData });
+  }
+  return months;
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const totalIncome = MOCK_DB.transactions.filter(t => t.type==='income' && t.status==='succeeded').reduce((s,t) => s+t.amount, 0);
+  const pendingIncome = MOCK_DB.transactions.filter(t => t.type==='income' && t.status==='pending').reduce((s,t) => s+t.amount, 0);
+  const now = new Date();
+  const monthIncome = MOCK_DB.transactions.filter(t => {
+    const d = new Date(t.created_at);
+    return t.type==='income' && t.status==='succeeded' && d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  }).reduce((s,t) => s+t.amount, 0);
+  const txnCount = MOCK_DB.transactions.filter(t => t.type==='income' && t.status==='succeeded').length;
+  const revByCat = getRevenueByCategory();
+  const monthlyByCat = getMonthlyRevenueByCat();
+  const catColors = {};
+  MOCK_DB.categories.forEach(c => { catColors[c.id] = c.color; });
+  catColors['other'] = '#94a3b8';
+
+  main.innerHTML = `
+    <div style="margin-bottom:var(--space-6)">
+      <h1 class="page-title" style="margin-bottom:var(--space-4)">Dashboard financiero</h1>
+      <div style="display:flex;gap:var(--space-1);border-bottom:2px solid var(--color-border);margin-bottom:var(--space-6)">
+        <a href="dashboard.html" class="tab">Resumen</a>
+        <a href="dashboard-revenue.html" class="tab tab-active">Ingresos</a>
+        <a href="dashboard-expenses.html" class="tab">Gastos</a>
+        <a href="dashboard-pl.html" class="tab">P&L</a>
+        <a href="dashboard-payroll.html" class="tab">Nómina</a>
+      </div>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Total ingresos</span><span style="font-size:1.5rem">💰</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalIncome)}</div>
+        <div class="scorecard-trend trend-up">pagos confirmados</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Este mes</span><span style="font-size:1.5rem">📅</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(monthIncome)}</div>
+        <div class="scorecard-trend trend-up">ingresos de mayo</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Pendiente por cobrar</span><span style="font-size:1.5rem">⏳</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(pendingIncome)}</div>
+        <div class="scorecard-trend ${pendingIncome>0?'trend-down':'trend-up'}">${pendingIncome>0?'por confirmar':'todo cobrado'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Transacciones</span><span style="font-size:1.5rem">🧾</span></div>
+        <div class="scorecard-value">${txnCount}</div>
+        <div class="scorecard-trend trend-up">pagos exitosos</div>
+      </div>
+    </div>
+
+    <div class="content-cols" style="margin-bottom:var(--space-6)">
+      <div class="card" style="padding:var(--space-5)">
+        <h3 style="margin-bottom:var(--space-4)">Ingresos mensuales por categoría</h3>
+        <div style="position:relative;height:280px">
+          <canvas id="monthly-rev-chart"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:var(--space-5)">
+        <h3 style="margin-bottom:var(--space-4)">Distribución por categoría</h3>
+        <div style="position:relative;height:220px">
+          <canvas id="cat-doughnut"></canvas>
+        </div>
+        <div style="margin-top:var(--space-4)">
+          ${MOCK_DB.categories.map(c => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+              <span style="display:flex;align-items:center;gap:var(--space-2)">
+                <span style="width:10px;height:10px;border-radius:50%;background:${c.color};display:inline-block"></span>
+                ${c.name}
+              </span>
+              <div style="text-align:right">
+                <div style="font-weight:600">${Utils.formatCurrency(revByCat[c.id]||0)}</div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-muted)">${totalIncome>0?Math.round((revByCat[c.id]||0)/totalIncome*100):0}%</div>
+              </div>
+            </div>
+          `).join('')}
+          ${revByCat['other'] > 0 ? `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) 0">
+              <span style="display:flex;align-items:center;gap:var(--space-2)">
+                <span style="width:10px;height:10px;border-radius:50%;background:#94a3b8;display:inline-block"></span>Otros
+              </span>
+              <div style="text-align:right">
+                <div style="font-weight:600">${Utils.formatCurrency(revByCat['other'])}</div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-muted)">${totalIncome>0?Math.round(revByCat['other']/totalIncome*100):0}%</div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <h3 style="margin-bottom:var(--space-4)">Resumen mensual de ingresos</h3>
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr>
+            <th>Mes</th>
+            ${MOCK_DB.categories.map(c => `<th>${c.name}</th>`).join('')}
+            <th>Total</th>
+          </tr></thead>
+          <tbody>
+            ${monthlyByCat.map(m => {
+              const total = MOCK_DB.categories.reduce((s,c) => s+(m[c.id]||0), 0) + (m['other']||0);
+              return `<tr>
+                <td style="font-weight:500">${m.label}</td>
+                ${MOCK_DB.categories.map(c => `<td>${m[c.id]>0?Utils.formatCurrency(m[c.id]):'—'}</td>`).join('')}
+                <td style="font-weight:700">${Utils.formatCurrency(total)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Stacked bar
+  const ctx1 = document.getElementById('monthly-rev-chart').getContext('2d');
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: monthlyByCat.map(m => m.label),
+      datasets: [
+        ...MOCK_DB.categories.map(c => ({
+          label: c.name,
+          data: monthlyByCat.map(m => m[c.id]||0),
+          backgroundColor: c.color + 'cc',
+          borderRadius: 2
+        })),
+        { label:'Otros', data: monthlyByCat.map(m => m['other']||0), backgroundColor:'#94a3b8cc', borderRadius:2 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom' } },
+      scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{ callback: v => '$'+v.toLocaleString() } } }
+    }
+  });
+
+  // Doughnut
+  const ctx2 = document.getElementById('cat-doughnut').getContext('2d');
+  new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: [...MOCK_DB.categories.map(c => c.name), 'Otros'],
+      datasets: [{ data:[...MOCK_DB.categories.map(c => revByCat[c.id]||0), revByCat['other']||0], backgroundColor:[...MOCK_DB.categories.map(c => c.color), '#94a3b8'], borderWidth:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+  });
+}
+
+renderPage();
+</script>
+</body>
+</html>

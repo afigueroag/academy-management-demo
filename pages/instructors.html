@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instructores — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Instructores', 'instructors');
+
+function getInstructors() {
+  return MOCK_DB.users.filter(u => u.role === 'instructor');
+}
+
+function getPendingPayroll(instructorId) {
+  return MOCK_DB.transactions
+    .filter(t => t.instructor_id === instructorId && t.type === 'payroll' && t.status === 'pending')
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function getPaidThisMonth(instructorId) {
+  const now = new Date();
+  return MOCK_DB.transactions
+    .filter(t => t.instructor_id === instructorId && t.type === 'payroll' && t.status === 'succeeded' &&
+      new Date(t.created_at).getMonth() === now.getMonth() &&
+      new Date(t.created_at).getFullYear() === now.getFullYear())
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function getTotalPendingPayroll() {
+  return getInstructors().reduce((sum, i) => sum + getPendingPayroll(i.id), 0);
+}
+
+function getTotalPaidThisMonth() {
+  return getInstructors().reduce((sum, i) => sum + getPaidThisMonth(i.id), 0);
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const instructors = getInstructors();
+  const totalHours = instructors.reduce((sum, i) => sum + DB.getInstructorHours(i.id), 0);
+  const totalPending = getTotalPendingPayroll();
+  const totalPaid = getTotalPaidThisMonth();
+
+  main.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-6)">
+      <div>
+        <h1 class="page-title">Instructores</h1>
+        <p style="color:var(--color-text-muted);margin-top:var(--space-1)">Gestión de instructores y nómina</p>
+      </div>
+      <div style="display:flex;gap:var(--space-3)">
+        <button class="btn btn-outline" onclick="openInvitePanel()">Invitar instructor</button>
+        <button class="btn btn-primary" onclick="openCreatePanel()">+ Agregar instructor</button>
+      </div>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Instructores activos</span><span style="font-size:1.5rem">👨‍🏫</span></div>
+        <div class="scorecard-value">${instructors.filter(i=>i.is_active).length}</div>
+        <div class="scorecard-trend trend-up">de ${instructors.length} totales</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Horas este mes</span><span style="font-size:1.5rem">🕐</span></div>
+        <div class="scorecard-value">${totalHours}</div>
+        <div class="scorecard-trend trend-up">horas impartidas</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Nómina pendiente</span><span style="font-size:1.5rem">⏳</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalPending)}</div>
+        <div class="scorecard-trend ${totalPending>0?'trend-down':'trend-up'}">${totalPending>0?'por liquidar':'al corriente'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Pagado este mes</span><span style="font-size:1.5rem">✅</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(totalPaid)}</div>
+        <div class="scorecard-trend trend-up">nómina liquidada</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr>
+            <th>Instructor</th>
+            <th>Clases</th>
+            <th>Horas/mes</th>
+            <th>Tarifa</th>
+            <th>Nómina pendiente</th>
+            <th>Pagado este mes</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr></thead>
+          <tbody>
+            ${instructors.map(inst => {
+              const classes = DB.getInstructorClasses(inst.id);
+              const hours = DB.getInstructorHours(inst.id);
+              const pending = getPendingPayroll(inst.id);
+              const paid = getPaidThisMonth(inst.id);
+              const expectedPay = hours * (inst.hourly_rate || 0);
+              return `<tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:var(--space-3)">
+                    ${Utils.avatarHtml(inst, 36)}
+                    <div>
+                      <div style="font-weight:500">${inst.first_name} ${inst.last_name}</div>
+                      <div style="font-size:var(--text-xs);color:var(--color-text-muted)">${inst.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>${classes.length} clase${classes.length!==1?'s':''}</td>
+                <td><strong>${hours}</strong> hrs</td>
+                <td>${inst.hourly_rate ? Utils.formatCurrency(inst.hourly_rate)+'/hr' : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                <td>${pending > 0 ? `<span style="color:var(--color-danger);font-weight:600">${Utils.formatCurrency(pending)}</span>` : '<span style="color:var(--color-success)">—</span>'}</td>
+                <td>${paid > 0 ? `<span style="color:var(--color-success);font-weight:600">${Utils.formatCurrency(paid)}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                <td><span class="badge ${inst.is_active?'badge-success':'badge-default'}">${inst.is_active?'Activo':'Inactivo'}</span></td>
+                <td>
+                  <div style="display:flex;gap:var(--space-2)">
+                    <button class="btn btn-ghost btn-icon" title="Ver detalle" onclick="openViewPanel('${inst.id}')">👁</button>
+                    <button class="btn btn-ghost btn-icon" title="Registrar nómina" onclick="openPayrollModal('${inst.id}')" ${!inst.is_active?'disabled':''}>💰</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: Invitar instructor -->
+    <div class="side-panel-backdrop" id="invite-backdrop" onclick="closePanel('invite-panel')" style="display:none"></div>
+    <div class="side-panel" id="invite-panel">
+      <div class="side-panel-header">
+        <h3>Invitar instructor</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('invite-panel')">✕</button>
+      </div>
+      <div style="padding:var(--space-5)">
+        <div class="form-group">
+          <label class="label">Nombre</label>
+          <input type="text" id="inv-name" class="input" placeholder="Nombre completo">
+        </div>
+        <div class="form-group">
+          <label class="label">Correo electrónico</label>
+          <input type="email" id="inv-email" class="input" placeholder="instructor@ejemplo.com">
+        </div>
+        <div class="form-group">
+          <label class="label">Tarifa por hora</label>
+          <input type="number" id="inv-rate" class="input" placeholder="300" min="0">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="sendInvite()">Enviar invitación</button>
+      </div>
+    </div>
+
+    <!-- Panel: Crear instructor -->
+    <div class="side-panel-backdrop" id="create-backdrop" onclick="closePanel('create-panel')" style="display:none"></div>
+    <div class="side-panel" id="create-panel">
+      <div class="side-panel-header">
+        <h3>Agregar instructor</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('create-panel')">✕</button>
+      </div>
+      <div style="padding:var(--space-5)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="label">Nombre</label>
+            <input type="text" id="cr-first" class="input" placeholder="Nombre">
+          </div>
+          <div class="form-group">
+            <label class="label">Apellido</label>
+            <input type="text" id="cr-last" class="input" placeholder="Apellido">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="label">Correo electrónico</label>
+          <input type="email" id="cr-email" class="input" placeholder="instructor@ejemplo.com">
+        </div>
+        <div class="form-group">
+          <label class="label">Teléfono</label>
+          <input type="tel" id="cr-phone" class="input" placeholder="+52 55 0000 0000">
+        </div>
+        <div class="form-group">
+          <label class="label">Tarifa por hora</label>
+          <input type="number" id="cr-rate" class="input" placeholder="300" min="0">
+        </div>
+        <div class="form-group">
+          <label class="label">Especialidad / disciplina</label>
+          <input type="text" id="cr-spec" class="input" placeholder="Ballet, Piano, Yoga…">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="createInstructor()">Agregar instructor</button>
+      </div>
+    </div>
+
+    <!-- Panel: Ver instructor -->
+    <div class="side-panel-backdrop" id="view-backdrop" onclick="closePanel('view-panel')" style="display:none"></div>
+    <div class="side-panel" id="view-panel" style="width:480px">
+      <div class="side-panel-header">
+        <h3 id="view-panel-title">Instructor</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('view-panel')">✕</button>
+      </div>
+      <div id="view-panel-body" style="padding:var(--space-5)"></div>
+    </div>
+
+    <!-- Modal: Registrar nómina -->
+    <div class="modal-backdrop" id="payroll-modal-backdrop" onclick="closeModal('payroll-modal')" style="display:none"></div>
+    <div class="modal" id="payroll-modal" style="display:none;max-width:440px">
+      <div class="modal-header">
+        <h3 id="payroll-modal-title">Registrar nómina</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal('payroll-modal')">✕</button>
+      </div>
+      <div id="payroll-modal-body" style="padding:var(--space-5)"></div>
+    </div>
+  `;
+}
+
+function openInvitePanel() {
+  document.getElementById('invite-backdrop').style.display = 'block';
+  document.getElementById('invite-panel').classList.add('open');
+}
+function openCreatePanel() {
+  document.getElementById('create-backdrop').style.display = 'block';
+  document.getElementById('create-panel').classList.add('open');
+}
+function closePanel(id) {
+  document.getElementById(id).classList.remove('open');
+  const bd = id.replace('-panel','-backdrop');
+  const el = document.getElementById(bd);
+  if (el) el.style.display = 'none';
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+  document.getElementById(id+'-backdrop').style.display = 'none';
+}
+
+function sendInvite() {
+  const name = document.getElementById('inv-name').value.trim();
+  const email = document.getElementById('inv-email').value.trim();
+  if (!name || !email) { Utils.toast('Campos requeridos','Completa nombre y correo','error'); return; }
+  const token = 'inv_' + Math.random().toString(36).substr(2,10);
+  MOCK_DB.invitations.push({ id:'inv_inst_'+Date.now(), academy_id:'acad_001', email, role:'instructor', token, invited_by:'user_001', created_at:new Date().toISOString(), accepted_at:null });
+  closePanel('invite-panel');
+  Utils.showEmailPreview(email, 'Invitación como instructor — Academia Arte y Movimiento',
+    `<p>Hola <strong>${name}</strong>,</p>
+    <p>Has sido invitado a ser instructor en <strong>Academia Arte y Movimiento</strong>.</p>
+    <p>Haz clic aquí para completar tu perfil y acceder a la plataforma.</p>
+    <p><a href="#" style="background:#6366f1;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Aceptar invitación</a></p>`
+  );
+}
+
+function createInstructor() {
+  const first = document.getElementById('cr-first').value.trim();
+  const last = document.getElementById('cr-last').value.trim();
+  const email = document.getElementById('cr-email').value.trim();
+  if (!first || !last || !email) { Utils.toast('Campos requeridos','Completa nombre, apellido y correo','error'); return; }
+  const rate = parseFloat(document.getElementById('cr-rate').value) || 0;
+  const newUser = {
+    id: 'user_inst_' + Date.now(),
+    email, first_name: first, last_name: last,
+    role: 'instructor',
+    phone: document.getElementById('cr-phone').value,
+    address: '',
+    date_of_birth: '',
+    is_active: true,
+    hourly_rate: rate,
+    payroll_type: 'hourly',
+    email_verified_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    categories: []
+  };
+  MOCK_DB.users.push(newUser);
+  closePanel('create-panel');
+  Utils.toast('Instructor agregado', `${first} ${last} ha sido registrado`, 'success');
+  renderPage();
+}
+
+function openViewPanel(instId) {
+  const inst = DB.getUser(instId);
+  if (!inst) return;
+  const classes = DB.getInstructorClasses(instId);
+  const hours = DB.getInstructorHours(instId);
+  const pending = getPendingPayroll(instId);
+  const paid = getPaidThisMonth(instId);
+  const payrollTxns = MOCK_DB.transactions.filter(t => t.instructor_id === instId && t.type === 'payroll').slice(0,5);
+
+  document.getElementById('view-panel-title').textContent = `${inst.first_name} ${inst.last_name}`;
+  document.getElementById('view-panel-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-5)">
+      ${Utils.avatarHtml(inst, 56)}
+      <div>
+        <div style="font-weight:600;font-size:var(--text-lg)">${inst.first_name} ${inst.last_name}</div>
+        <div style="color:var(--color-text-muted);font-size:var(--text-sm)">${inst.email}</div>
+        <div style="color:var(--color-text-muted);font-size:var(--text-sm)">${inst.phone || ''}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5)">
+      <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Tarifa por hora</div>
+        <div style="font-size:var(--text-xl);font-weight:700">${inst.hourly_rate ? Utils.formatCurrency(inst.hourly_rate) : '—'}</div>
+      </div>
+      <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Horas este mes</div>
+        <div style="font-size:var(--text-xl);font-weight:700">${hours} hrs</div>
+      </div>
+      <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Nómina pendiente</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:${pending>0?'var(--color-danger)':'var(--color-success)'}">${pending>0?Utils.formatCurrency(pending):'—'}</div>
+      </div>
+      <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Pagado este mes</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">${paid>0?Utils.formatCurrency(paid):'—'}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:var(--space-4)">
+      <div style="font-weight:600;margin-bottom:var(--space-3)">Clases asignadas (${classes.length})</div>
+      ${classes.map(c => `
+        <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+          <span>${c.name}</span>
+          <span style="font-size:var(--text-xs);color:var(--color-text-muted)">${Utils.dayLabel(c.schedule_day)} ${c.schedule_time}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-bottom:var(--space-5)">
+      <div style="font-weight:600;margin-bottom:var(--space-3)">Historial de nómina</div>
+      ${payrollTxns.length ? payrollTxns.map(t => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+          <div>
+            <div style="font-size:var(--text-sm)">${t.description}</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted)">${Utils.formatDate(t.created_at)}</div>
+          </div>
+          <span class="badge ${t.status==='succeeded'?'badge-success':'badge-warning'}">${Utils.formatCurrency(t.amount)}</span>
+        </div>
+      `).join('') : '<p style="color:var(--color-text-muted);font-size:var(--text-sm)">Sin registros de nómina</p>'}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+      <button class="btn btn-primary" onclick="openPayrollModal('${instId}');closePanel('view-panel')">Registrar nómina</button>
+    </div>
+  `;
+  document.getElementById('view-backdrop').style.display = 'block';
+  document.getElementById('view-panel').classList.add('open');
+}
+
+function openPayrollModal(instId) {
+  const inst = DB.getUser(instId);
+  const hours = DB.getInstructorHours(instId);
+  const pending = getPendingPayroll(instId);
+  const suggested = inst.hourly_rate ? hours * inst.hourly_rate : pending;
+
+  document.getElementById('payroll-modal-title').textContent = `Registrar nómina — ${inst.first_name} ${inst.last_name}`;
+  document.getElementById('payroll-modal-body').innerHTML = `
+    <div style="background:var(--color-bg);padding:var(--space-4);border-radius:var(--radius-md);margin-bottom:var(--space-4)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-2)">
+        <span style="color:var(--color-text-muted)">Horas este mes</span>
+        <strong>${hours} hrs</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-2)">
+        <span style="color:var(--color-text-muted)">Tarifa por hora</span>
+        <strong>${inst.hourly_rate ? Utils.formatCurrency(inst.hourly_rate) : 'N/A'}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--color-border);padding-top:var(--space-2)">
+        <span style="color:var(--color-text-muted)">Total sugerido</span>
+        <strong style="color:var(--color-primary)">${Utils.formatCurrency(suggested)}</strong>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="label">Período</label>
+      <input type="text" id="pr-period" class="input" value="Mayo 2026">
+    </div>
+    <div class="form-group">
+      <label class="label">Monto a pagar</label>
+      <input type="number" id="pr-amount" class="input" value="${suggested}" min="0">
+    </div>
+    <div class="form-group">
+      <label class="label">Método de pago</label>
+      <select id="pr-method" class="select">
+        <option value="transfer">Transferencia bancaria</option>
+        <option value="cash">Efectivo</option>
+        <option value="check">Cheque</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="label">Nota (opcional)</label>
+      <input type="text" id="pr-note" class="input" placeholder="Período quincenal, bonos, etc.">
+    </div>
+    <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5)">
+      <button class="btn btn-outline" style="flex:1" onclick="closeModal('payroll-modal')">Cancelar</button>
+      <button class="btn btn-primary" style="flex:1" onclick="processPayroll('${instId}')">Registrar pago</button>
+    </div>
+  `;
+  document.getElementById('payroll-modal-backdrop').style.display = 'block';
+  document.getElementById('payroll-modal').style.display = 'flex';
+}
+
+function processPayroll(instId) {
+  const inst = DB.getUser(instId);
+  const amount = parseFloat(document.getElementById('pr-amount').value);
+  const period = document.getElementById('pr-period').value;
+  const method = document.getElementById('pr-method').value;
+  const note = document.getElementById('pr-note').value;
+  if (!amount || amount <= 0) { Utils.toast('Error','Monto inválido','error'); return; }
+
+  const pendingTxns = MOCK_DB.transactions.filter(t => t.instructor_id === instId && t.type === 'payroll' && t.status === 'pending');
+  for (const t of pendingTxns) { t.status = 'succeeded'; }
+
+  DB.addTransaction({
+    instructor_id: instId, type:'payroll', category:'payroll',
+    description: `Nómina ${period}${note?' — '+note:''}`,
+    amount, status:'succeeded', payment_method: method,
+    created_at: new Date().toISOString()
+  });
+  closeModal('payroll-modal');
+  Utils.toast('Nómina registrada', `${Utils.formatCurrency(amount)} pagado a ${inst.first_name}`, 'success');
+  renderPage();
+}
+
+renderPage();
+</script>
+</body>
+</html>

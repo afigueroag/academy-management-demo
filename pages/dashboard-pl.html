@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P&L — Dashboard</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+Auth.requireRole(['admin']);
+Utils.renderAppLayout('Dashboard', 'dashboard');
+
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function getMonthlyPL() {
+  const now = new Date();
+  return Array.from({length:6}, (_, i) => {
+    const target = new Date(now.getFullYear(), now.getMonth() - (5-i), 1);
+    const txns = MOCK_DB.transactions.filter(t => {
+      const d = new Date(t.created_at);
+      return t.status==='succeeded' && d.getMonth()===target.getMonth() && d.getFullYear()===target.getFullYear();
+    });
+    const income = txns.filter(t => t.type==='income').reduce((s,t) => s+t.amount, 0);
+    const expenses = txns.filter(t => t.type==='expense').reduce((s,t) => s+t.amount, 0);
+    const payroll = txns.filter(t => t.type==='payroll').reduce((s,t) => s+t.amount, 0);
+    const net = income - expenses - payroll;
+    return { label: MONTHS[target.getMonth()], income, expenses, payroll, net, margin: income>0 ? Math.round(net/income*100) : 0 };
+  });
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const monthly = getMonthlyPL();
+  const current = monthly[monthly.length - 1];
+  const prev = monthly[monthly.length - 2];
+  const totalNet = monthly.reduce((s,m) => s+m.net, 0);
+  const totalIncome = monthly.reduce((s,m) => s+m.income, 0);
+  const avgMargin = totalIncome>0 ? Math.round(totalNet/totalIncome*100) : 0;
+  const bestMonth = monthly.reduce((best, m) => m.net > best.net ? m : best, monthly[0]);
+
+  main.innerHTML = `
+    <div style="margin-bottom:var(--space-6)">
+      <h1 class="page-title" style="margin-bottom:var(--space-4)">Dashboard financiero</h1>
+      <div style="display:flex;gap:var(--space-1);border-bottom:2px solid var(--color-border);margin-bottom:var(--space-6)">
+        <a href="dashboard.html" class="tab">Resumen</a>
+        <a href="dashboard-revenue.html" class="tab">Ingresos</a>
+        <a href="dashboard-expenses.html" class="tab">Gastos</a>
+        <a href="dashboard-pl.html" class="tab tab-active">P&L</a>
+        <a href="dashboard-payroll.html" class="tab">Nómina</a>
+      </div>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Ingreso neto (6 meses)</span><span style="font-size:1.5rem">📈</span></div>
+        <div class="scorecard-value" style="color:${totalNet>=0?'var(--color-success)':'var(--color-danger)'}">${Utils.formatCurrency(Math.abs(totalNet))}</div>
+        <div class="scorecard-trend ${totalNet>=0?'trend-up':'trend-down'}">${totalNet>=0?'ganancia':'pérdida'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Margen neto promedio</span><span style="font-size:1.5rem">%</span></div>
+        <div class="scorecard-value" style="color:${avgMargin>=20?'var(--color-success)':avgMargin>=0?'var(--color-warning)':'var(--color-danger)'}">${avgMargin}%</div>
+        <div class="scorecard-trend ${avgMargin>=0?'trend-up':'trend-down'}">últimos 6 meses</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Este mes</span><span style="font-size:1.5rem">📅</span></div>
+        <div class="scorecard-value" style="color:${current.net>=0?'var(--color-success)':'var(--color-danger)'}">${Utils.formatCurrency(Math.abs(current.net))}</div>
+        <div class="scorecard-trend ${current.net>=prev.net?'trend-up':'trend-down'}">${current.net>=prev.net?'mejor que el mes anterior':'menor que el mes anterior'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Mejor mes</span><span style="font-size:1.5rem">🏆</span></div>
+        <div class="scorecard-value" style="font-size:var(--text-xl)">${bestMonth.label}</div>
+        <div class="scorecard-trend trend-up">${Utils.formatCurrency(bestMonth.net)} neto</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5);margin-bottom:var(--space-6)">
+      <h3 style="margin-bottom:var(--space-4)">Tendencia P&L — últimos 6 meses</h3>
+      <div style="position:relative;height:300px">
+        <canvas id="pl-line-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <h3 style="margin-bottom:var(--space-4)">Estado de resultados mensual</h3>
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr>
+            <th>Mes</th>
+            <th>Ingresos</th>
+            <th>Gastos operativos</th>
+            <th>Nómina</th>
+            <th>Total costos</th>
+            <th>Ingreso neto</th>
+            <th>Margen</th>
+          </tr></thead>
+          <tbody>
+            ${monthly.map(m => `
+              <tr>
+                <td style="font-weight:500">${m.label}</td>
+                <td style="color:var(--color-success);font-weight:600">${Utils.formatCurrency(m.income)}</td>
+                <td style="color:var(--color-danger)">${m.expenses>0?Utils.formatCurrency(m.expenses):'—'}</td>
+                <td style="color:var(--color-warning)">${m.payroll>0?Utils.formatCurrency(m.payroll):'—'}</td>
+                <td>${Utils.formatCurrency(m.expenses+m.payroll)}</td>
+                <td style="font-weight:700;color:${m.net>=0?'var(--color-success)':'var(--color-danger)'}">${m.net>=0?'':'-'}${Utils.formatCurrency(Math.abs(m.net))}</td>
+                <td>
+                  <span style="font-weight:500;color:${m.margin>=20?'var(--color-success)':m.margin>=0?'var(--color-text)':'var(--color-danger)'}">${m.margin}%</span>
+                </td>
+              </tr>
+            `).join('')}
+            <tr style="background:var(--color-bg);font-weight:700">
+              <td>Total</td>
+              <td style="color:var(--color-success)">${Utils.formatCurrency(monthly.reduce((s,m)=>s+m.income,0))}</td>
+              <td style="color:var(--color-danger)">${Utils.formatCurrency(monthly.reduce((s,m)=>s+m.expenses,0))}</td>
+              <td style="color:var(--color-warning)">${Utils.formatCurrency(monthly.reduce((s,m)=>s+m.payroll,0))}</td>
+              <td>${Utils.formatCurrency(monthly.reduce((s,m)=>s+m.expenses+m.payroll,0))}</td>
+              <td style="color:${totalNet>=0?'var(--color-success)':'var(--color-danger)'}">${totalNet>=0?'':'-'}${Utils.formatCurrency(Math.abs(totalNet))}</td>
+              <td style="color:${avgMargin>=0?'var(--color-success)':'var(--color-danger)'}">${avgMargin}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const ctx = document.getElementById('pl-line-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: monthly.map(m => m.label),
+      datasets: [
+        {
+          label: 'Ingresos',
+          data: monthly.map(m => m.income),
+          borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)',
+          tension: 0.4, fill: false, pointRadius: 5, pointHoverRadius: 7
+        },
+        {
+          label: 'Total costos',
+          data: monthly.map(m => m.expenses + m.payroll),
+          borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)',
+          tension: 0.4, fill: false, pointRadius: 5, pointHoverRadius: 7
+        },
+        {
+          label: 'Ingreso neto',
+          data: monthly.map(m => m.net),
+          borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
+          tension: 0.4, fill: true, pointRadius: 5, pointHoverRadius: 7,
+          borderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: {
+          ticks: { callback: v => '$'+v.toLocaleString() },
+          grid: { color: 'rgba(0,0,0,0.06)' }
+        }
+      }
+    }
+  });
+}
+
+renderPage();
+</script>
+</body>
+</html>

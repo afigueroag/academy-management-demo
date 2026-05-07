@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ventas — Academia</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+Auth.requireRole(['admin','receptionist']);
+Utils.renderAppLayout('Ventas', 'sales');
+
+const state = {
+  filterType: 'income',
+  filterStatus: '',
+  search: '',
+  dateFrom: '',
+  dateTo: ''
+};
+
+function getIncomeTransactions() {
+  return MOCK_DB.transactions.filter(t => t.type === 'income');
+}
+
+function filteredTransactions() {
+  let list = MOCK_DB.transactions;
+  if (state.filterType) list = list.filter(t => t.type === state.filterType);
+  if (state.filterStatus) list = list.filter(t => t.status === state.filterStatus);
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    list = list.filter(t => {
+      const student = t.student_id ? DB.getUser(t.student_id) : null;
+      return t.description.toLowerCase().includes(q) ||
+        (student && (`${student.first_name} ${student.last_name}`).toLowerCase().includes(q));
+    });
+  }
+  if (state.dateFrom) list = list.filter(t => new Date(t.created_at) >= new Date(state.dateFrom));
+  if (state.dateTo) list = list.filter(t => new Date(t.created_at) <= new Date(state.dateTo + 'T23:59:59'));
+  return list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function getMonthStats() {
+  const now = new Date();
+  const monthTxns = MOCK_DB.transactions.filter(t => {
+    const d = new Date(t.created_at);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const income = monthTxns.filter(t => t.type === 'income');
+  return {
+    total: income.filter(t => t.status === 'succeeded').reduce((s,t) => s+t.amount, 0),
+    pending: income.filter(t => t.status === 'pending').reduce((s,t) => s+t.amount, 0),
+    overdue: income.filter(t => t.status === 'failed').reduce((s,t) => s+t.amount, 0),
+    refunded: monthTxns.filter(t => t.status === 'refunded').reduce((s,t) => s+t.amount, 0)
+  };
+}
+
+function renderPage() {
+  const main = document.getElementById('app-main');
+  const stats = getMonthStats();
+
+  main.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-6)">
+      <div>
+        <h1 class="page-title">Ventas y pagos</h1>
+        <p style="color:var(--color-text-muted);margin-top:var(--space-1)">Registro de transacciones e ingresos</p>
+      </div>
+      <button class="btn btn-primary" onclick="openNewPaymentModal()">+ Registrar pago</button>
+    </div>
+
+    <div class="scorecard-grid" style="margin-bottom:var(--space-6)">
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Cobrado este mes</span><span style="font-size:1.5rem">💰</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.total)}</div>
+        <div class="scorecard-trend trend-up">pagos exitosos</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Pendiente</span><span style="font-size:1.5rem">⏳</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.pending)}</div>
+        <div class="scorecard-trend ${stats.pending>0?'trend-down':'trend-up'}">${stats.pending>0?'por cobrar':'al corriente'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Vencido</span><span style="font-size:1.5rem">⚠️</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.overdue)}</div>
+        <div class="scorecard-trend ${stats.overdue>0?'trend-down':'trend-up'}">${stats.overdue>0?'pagos fallidos':'sin vencidos'}</div>
+      </div>
+      <div class="scorecard">
+        <div class="scorecard-top"><span class="scorecard-label">Reembolsado</span><span style="font-size:1.5rem">↩️</span></div>
+        <div class="scorecard-value">${Utils.formatCurrency(stats.refunded)}</div>
+        <div class="scorecard-trend trend-down">devoluciones</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5)">
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4);align-items:center">
+        <div class="search-input" style="flex:1;min-width:200px">
+          <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+          <input type="text" class="search-field" placeholder="Buscar por alumno o concepto…" oninput="state.search=this.value;renderTable()" value="${state.search}">
+        </div>
+        <select class="select" style="width:auto" onchange="state.filterType=this.value;renderTable()">
+          <option value="income" ${state.filterType==='income'?'selected':''}>Ingresos</option>
+          <option value="expense" ${state.filterType==='expense'?'selected':''}>Gastos</option>
+          <option value="payroll" ${state.filterType==='payroll'?'selected':''}>Nómina</option>
+          <option value="" ${state.filterType===''?'selected':''}>Todos</option>
+        </select>
+        <select class="select" style="width:auto" onchange="state.filterStatus=this.value;renderTable()">
+          <option value="">Todos los estados</option>
+          <option value="succeeded" ${state.filterStatus==='succeeded'?'selected':''}>Pagado</option>
+          <option value="pending" ${state.filterStatus==='pending'?'selected':''}>Pendiente</option>
+          <option value="failed" ${state.filterStatus==='failed'?'selected':''}>Fallido</option>
+          <option value="refunded" ${state.filterStatus==='refunded'?'selected':''}>Reembolsado</option>
+        </select>
+        <input type="date" class="input" style="width:auto" onchange="state.dateFrom=this.value;renderTable()" value="${state.dateFrom}" title="Desde">
+        <input type="date" class="input" style="width:auto" onchange="state.dateTo=this.value;renderTable()" value="${state.dateTo}" title="Hasta">
+      </div>
+      <div id="sales-table-wrap"></div>
+    </div>
+
+    <!-- Modal: Registrar pago -->
+    <div class="modal-backdrop" id="new-pay-backdrop" onclick="closeModal('new-pay-modal')" style="display:none"></div>
+    <div class="modal" id="new-pay-modal" style="display:none;max-width:480px">
+      <div class="modal-header">
+        <h3>Registrar pago manual</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal('new-pay-modal')">✕</button>
+      </div>
+      <div style="padding:var(--space-5)">
+        <div class="form-group">
+          <label class="label">Alumno</label>
+          <select id="np-student" class="select">
+            <option value="">Seleccionar alumno…</option>
+            ${MOCK_DB.users.filter(u=>u.role==='student'&&u.is_active).map(s => `<option value="${s.id}">${s.first_name} ${s.last_name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label">Concepto</label>
+          <select id="np-concept" class="select">
+            <option value="Mensualidad">Mensualidad</option>
+            <option value="Inscripción">Inscripción</option>
+            <option value="Pago por clase">Pago por clase</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label">Descripción adicional</label>
+          <input type="text" id="np-desc" class="input" placeholder="Detalles opcionales…">
+        </div>
+        <div class="form-group">
+          <label class="label">Monto</label>
+          <input type="number" id="np-amount" class="input" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="label">Método de pago</label>
+          <select id="np-method" class="select">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+            <option value="card">Tarjeta</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5)">
+          <button class="btn btn-outline" style="flex:1" onclick="closeModal('new-pay-modal')">Cancelar</button>
+          <button class="btn btn-primary" style="flex:1" onclick="processNewPayment()">Registrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Ver transacción -->
+    <div class="side-panel-backdrop" id="txn-backdrop" onclick="closePanel('txn-panel')" style="display:none"></div>
+    <div class="side-panel" id="txn-panel">
+      <div class="side-panel-header">
+        <h3 id="txn-panel-title">Transacción</h3>
+        <button class="btn btn-ghost btn-icon" onclick="closePanel('txn-panel')">✕</button>
+      </div>
+      <div id="txn-panel-body" style="padding:var(--space-5)"></div>
+    </div>
+  `;
+
+  renderTable();
+}
+
+function renderTable() {
+  const list = filteredTransactions();
+  const wrap = document.getElementById('sales-table-wrap');
+  if (!wrap) return;
+  if (!list.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Sin transacciones</div><div class="empty-desc">No hay registros que coincidan con los filtros.</div></div>`;
+    return;
+  }
+  const typeLabel = { income:'Ingreso', expense:'Gasto', payroll:'Nómina' };
+  const typeClass = { income:'badge-success', expense:'badge-danger', payroll:'badge-warning' };
+  const statusLabel = { succeeded:'Pagado', pending:'Pendiente', failed:'Fallido', refunded:'Reembolsado' };
+  const statusClass = { succeeded:'badge-success', pending:'badge-warning', failed:'badge-danger', refunded:'badge-default' };
+
+  wrap.innerHTML = `
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr>
+          <th>Fecha</th>
+          <th>Alumno / Instructor</th>
+          <th>Concepto</th>
+          <th>Tipo</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(t => {
+            const person = t.student_id ? DB.getUser(t.student_id) : (t.instructor_id ? DB.getUser(t.instructor_id) : null);
+            return `<tr>
+              <td style="white-space:nowrap;color:var(--color-text-muted);font-size:var(--text-sm)">${Utils.formatDate(t.created_at)}</td>
+              <td>
+                ${person ? `
+                  <div style="display:flex;align-items:center;gap:var(--space-2)">
+                    ${Utils.avatarHtml(person,28)}
+                    <span style="font-size:var(--text-sm)">${person.first_name} ${person.last_name}</span>
+                  </div>
+                ` : '<span style="color:var(--color-text-muted)">—</span>'}
+              </td>
+              <td style="font-size:var(--text-sm)">${t.description}</td>
+              <td><span class="badge ${typeClass[t.type]||'badge-default'}">${typeLabel[t.type]||t.type}</span></td>
+              <td style="font-weight:600;white-space:nowrap">${Utils.formatCurrency(t.amount)}</td>
+              <td><span class="badge ${statusClass[t.status]||'badge-default'}">${statusLabel[t.status]||t.status}</span></td>
+              <td>
+                <div style="display:flex;gap:var(--space-2)">
+                  <button class="btn btn-ghost btn-icon" title="Ver detalle" onclick="openTxnPanel('${t.id}')">👁</button>
+                  ${t.status==='succeeded' ? `<button class="btn btn-ghost btn-icon" title="Simular recibo" onclick="showReceipt('${t.id}')">🧾</button>` : ''}
+                  ${t.status==='succeeded' && t.type==='income' ? `<button class="btn btn-ghost btn-icon" title="Reembolsar" onclick="refundTxn('${t.id}')" style="color:var(--color-danger)">↩️</button>` : ''}
+                  ${t.status==='pending' ? `<button class="btn btn-ghost btn-icon" title="Marcar pagado" onclick="markPaid('${t.id}')" style="color:var(--color-success)">✓</button>` : ''}
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:var(--space-3) 0">
+      ${list.length} transacción${list.length!==1?'es':''} — Total: ${Utils.formatCurrency(list.filter(t=>t.status==='succeeded').reduce((s,t)=>s+t.amount,0))}
+    </div>
+  `;
+}
+
+function openModal(id) {
+  document.getElementById(id+'-backdrop').style.display = 'block';
+  document.getElementById(id).style.display = 'flex';
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+  document.getElementById(id+'-backdrop').style.display = 'none';
+}
+function closePanel(id) {
+  document.getElementById(id).classList.remove('open');
+  const bd = id.replace('-panel','-backdrop');
+  const el = document.getElementById(bd);
+  if (el) el.style.display = 'none';
+}
+
+function openNewPaymentModal() {
+  openModal('new-pay-modal');
+}
+
+function processNewPayment() {
+  const studentId = document.getElementById('np-student').value;
+  const concept = document.getElementById('np-concept').value;
+  const desc = document.getElementById('np-desc').value;
+  const amount = parseFloat(document.getElementById('np-amount').value);
+  const method = document.getElementById('np-method').value;
+  if (!studentId) { Utils.toast('Error','Selecciona un alumno','error'); return; }
+  if (!amount || amount <= 0) { Utils.toast('Error','Monto inválido','error'); return; }
+  const student = DB.getUser(studentId);
+  DB.addTransaction({
+    student_id: studentId, type:'income', category:'enrollment',
+    description: `${concept}${desc?' — '+desc:''}`,
+    amount, status:'succeeded', payment_method: method,
+    created_at: new Date().toISOString()
+  });
+  closeModal('new-pay-modal');
+  Utils.toast('Pago registrado', `${Utils.formatCurrency(amount)} registrado para ${student.first_name}`, 'success');
+  renderTable();
+}
+
+function openTxnPanel(txnId) {
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (!t) return;
+  const person = t.student_id ? DB.getUser(t.student_id) : (t.instructor_id ? DB.getUser(t.instructor_id) : null);
+  const statusLabel = { succeeded:'Pagado', pending:'Pendiente', failed:'Fallido', refunded:'Reembolsado' };
+  const statusClass = { succeeded:'badge-success', pending:'badge-warning', failed:'badge-danger', refunded:'badge-default' };
+  document.getElementById('txn-panel-title').textContent = 'Transacción #' + t.id;
+  document.getElementById('txn-panel-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Estado</span>
+        <span class="badge ${statusClass[t.status]||'badge-default'}">${statusLabel[t.status]||t.status}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Monto</span>
+        <strong style="font-size:var(--text-xl)">${Utils.formatCurrency(t.amount)}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Concepto</span>
+        <span>${t.description}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Tipo</span>
+        <span>${t.type === 'income' ? 'Ingreso' : t.type === 'expense' ? 'Gasto' : 'Nómina'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Fecha</span>
+        <span>${Utils.formatDate(t.created_at)}</span>
+      </div>
+      ${person ? `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--color-text-muted)">${t.student_id ? 'Alumno' : 'Instructor'}</span>
+        <div style="display:flex;align-items:center;gap:var(--space-2)">${Utils.avatarHtml(person,24)}<span>${person.first_name} ${person.last_name}</span></div>
+      </div>` : ''}
+      ${t.payment_method ? `
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--color-text-muted)">Método</span>
+        <span>${t.payment_method === 'cash' ? 'Efectivo' : t.payment_method === 'transfer' ? 'Transferencia' : 'Tarjeta'}</span>
+      </div>` : ''}
+    </div>
+    <div style="margin-top:var(--space-6);display:flex;flex-direction:column;gap:var(--space-3)">
+      ${t.status === 'succeeded' ? `<button class="btn btn-outline" onclick="showReceipt('${t.id}')">🧾 Ver recibo</button>` : ''}
+      ${t.status === 'succeeded' && t.type === 'income' ? `<button class="btn btn-danger" onclick="refundTxn('${t.id}');closePanel('txn-panel')">↩️ Reembolsar</button>` : ''}
+      ${t.status === 'pending' ? `<button class="btn btn-success" onclick="markPaid('${t.id}');closePanel('txn-panel')">✓ Marcar como pagado</button>` : ''}
+    </div>
+  `;
+  document.getElementById('txn-backdrop').style.display = 'block';
+  document.getElementById('txn-panel').classList.add('open');
+}
+
+function showReceipt(txnId) {
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  const person = t && t.student_id ? DB.getUser(t.student_id) : null;
+  Utils.showEmailPreview(
+    person ? person.email : 'cliente@ejemplo.com',
+    'Recibo de pago — Academia Arte y Movimiento',
+    `<div style="font-family:sans-serif;max-width:500px;margin:0 auto">
+      <h2 style="color:#6366f1">Recibo de pago</h2>
+      <p><strong>Academia Arte y Movimiento</strong><br>Av. Insurgentes Sur 1234, CDMX<br>RFC: AAM2024010101</p>
+      <hr>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="padding:8px 0;color:#666">Folio</td><td style="text-align:right;font-weight:600">${t.id}</td></tr>
+        <tr><td style="padding:8px 0;color:#666">Fecha</td><td style="text-align:right">${Utils.formatDate(t.created_at)}</td></tr>
+        <tr><td style="padding:8px 0;color:#666">Concepto</td><td style="text-align:right">${t.description}</td></tr>
+        ${person ? `<tr><td style="padding:8px 0;color:#666">Alumno</td><td style="text-align:right">${person.first_name} ${person.last_name}</td></tr>` : ''}
+        <tr style="border-top:2px solid #eee"><td style="padding:12px 0;font-weight:700">Total</td><td style="text-align:right;font-size:1.2em;font-weight:700;color:#6366f1">${Utils.formatCurrency(t.amount)}</td></tr>
+      </table>
+      <p style="color:#888;font-size:12px;text-align:center;margin-top:24px">Este es un recibo simulado para demostración.</p>
+    </div>`
+  );
+}
+
+function refundTxn(txnId) {
+  if (!confirm('¿Confirmar reembolso de esta transacción?')) return;
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (t) { t.status = 'refunded'; }
+  Utils.toast('Reembolso procesado', 'La transacción ha sido reembolsada', 'warning');
+  renderTable();
+}
+
+function markPaid(txnId) {
+  const t = MOCK_DB.transactions.find(x => x.id === txnId);
+  if (t) { t.status = 'succeeded'; }
+  Utils.toast('Pago confirmado', 'Transacción marcada como pagada', 'success');
+  renderTable();
+}
+
+renderPage();
+</script>
+</body>
+</html>
