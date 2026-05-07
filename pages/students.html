@@ -171,7 +171,7 @@ function renderPage() {
         <h3>Crear alumno</h3>
         <button class="btn btn-ghost btn-icon" onclick="closePanel('create-panel')">✕</button>
       </div>
-      <div style="padding:var(--space-5)">
+      <div style="padding:var(--space-5);overflow-y:auto;max-height:calc(100vh - 80px)">
         <div class="form-row">
           <div class="form-group">
             <label class="label">Nombre</label>
@@ -204,10 +204,16 @@ function renderPage() {
         ${MOCK_DB.axes.map(axis => `
         <div class="form-group">
           <label class="label">${axis.name}${axis.ordered ? ' <span style="font-size:11px;color:var(--color-text-muted)">(ordenado)</span>' : ''}</label>
-          <select id="cr-grp-${axis.id}" class="input select">
-            <option value="">Sin asignar</option>
-            ${DB.getGroupsByAxis(axis.id).map(g => `<option value="${g.id}">${axis.ordered ? g.order + '. ' : ''}${g.name}</option>`).join('')}
-          </select>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 10px;border-radius:9999px;border:1px solid var(--color-border)">
+              <input type="radio" name="cr-grp-${axis.id}" value="" checked style="margin:0">
+              <span style="font-size:var(--text-sm);color:var(--color-text-muted)">Sin asignar</span>
+            </label>
+            ${DB.getGroupsByAxis(axis.id).map(g => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 10px;border-radius:9999px;border:1px solid ${g.color}44;background:${g.color}11">
+              <input type="radio" name="cr-grp-${axis.id}" value="${g.id}" style="accent-color:${g.color};margin:0">
+              <span style="font-size:var(--text-sm);color:${g.color};font-weight:500">${g.name}</span>
+            </label>`).join('')}
+          </div>
         </div>`).join('')}
         <div class="form-group">
           <label class="label">Fecha de inicio</label>
@@ -375,7 +381,7 @@ function createStudent() {
   const email = document.getElementById('cr-email').value.trim();
   if (!first || !last || !email) { Utils.toast('Campos requeridos','Completa nombre, apellido y correo','error'); return; }
   const planId = document.getElementById('cr-plan').value;
-  const groups = MOCK_DB.axes.map(ax => document.getElementById('cr-grp-' + ax.id)?.value).filter(Boolean);
+  const groups = MOCK_DB.axes.map(ax => document.querySelector(`input[name="cr-grp-${ax.id}"]:checked`)?.value).filter(Boolean);
   const newUser = {
     id: 'user_' + (MOCK_DB.users.length + 1).toString().padStart(3,'0'),
     email, first_name: first, last_name: last,
@@ -491,10 +497,16 @@ function openEditPanel(userId) {
     ${MOCK_DB.axes.map(axis => `
     <div class="form-group">
       <label class="label">${axis.name}${axis.ordered ? ' <span style="font-size:11px;color:var(--color-text-muted)">(ordenado)</span>' : ''}</label>
-      <select id="ed-grp-${axis.id}" class="input select">
-        <option value="">Sin asignar</option>
-        ${DB.getGroupsByAxis(axis.id).map(g => `<option value="${g.id}" ${(s.groups||[]).includes(g.id)?'selected':''}>${axis.ordered ? g.order + '. ' : ''}${g.name}</option>`).join('')}
-      </select>
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 10px;border-radius:9999px;border:1px solid var(--color-border)">
+          <input type="radio" name="ed-grp-${axis.id}" value="" ${!(s.groups||[]).find(gid => DB.getGroupsByAxis(axis.id).some(g => g.id===gid)) ? 'checked' : ''} style="margin:0">
+          <span style="font-size:var(--text-sm);color:var(--color-text-muted)">Sin asignar</span>
+        </label>
+        ${DB.getGroupsByAxis(axis.id).map(g => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 10px;border-radius:9999px;border:1px solid ${g.color}44;background:${g.color}11">
+          <input type="radio" name="ed-grp-${axis.id}" value="${g.id}" ${(s.groups||[]).includes(g.id) ? 'checked' : ''} style="accent-color:${g.color};margin:0">
+          <span style="font-size:var(--text-sm);color:${g.color};font-weight:500">${g.name}</span>
+        </label>`).join('')}
+      </div>
     </div>`).join('')}
     <div class="form-group">
       <label class="label">Fecha de inicio</label>
@@ -533,7 +545,7 @@ function saveStudent(userId) {
   s.address       = document.getElementById('ed-addr').value.trim();
   s.payment_method = document.getElementById('ed-method').value;
   s.plan_id = document.getElementById('ed-plan').value || null;
-  s.groups = MOCK_DB.axes.map(ax => document.getElementById('ed-grp-' + ax.id)?.value).filter(Boolean);
+  s.groups = MOCK_DB.axes.map(ax => document.querySelector(`input[name="ed-grp-${ax.id}"]:checked`)?.value).filter(Boolean);
   closePanel('edit-panel');
   Utils.toast('Alumno actualizado', `${s.first_name} ${s.last_name} fue actualizado correctamente.`, 'success');
   renderPage();
