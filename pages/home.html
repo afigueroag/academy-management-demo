@@ -71,8 +71,8 @@ function buildStudentHome(u) {
        </div>`
     : enrollments.map(e => {
         const cls = DB.getClass(e.class_id);
-        const inst = cls ? DB.getUser(cls.instructor_id) : null;
-        const pendingTxn = MOCK_DB.transactions.find(t => t.student_id === u.id && t.class_id === e.class_id && t.status === 'pending');
+        const inst = cls ? DB.getUser((cls.instructor_ids||[])[0]) : null;
+        const pendingTxn = MOCK_DB.transactions.find(t => t.student_id === u.id && t.type === 'income' && t.status === 'pending');
         return `
         <tr>
           <td>
@@ -88,12 +88,12 @@ function buildStudentHome(u) {
           <td>${(cls?.plan_ids||[]).map(pid => Utils.planBadge(pid)).join('')}</td>
           <td>
             ${pendingTxn
-              ? `<span class="badge badge-warning">Pendiente ${Utils.formatCurrency(pendingTxn.amount)}</span>`
+              ? `<span class="badge badge-warning">${pendingTxn.subcategory} · ${Utils.formatCurrency(pendingTxn.amount)}</span>`
               : `<span class="badge badge-success">Al corriente</span>`}
           </td>
           <td>
             <div class="actions">
-              ${pendingTxn ? `<button class="btn btn-primary btn-xs" onclick="openPaymentModal('${pendingTxn.id}','${cls?.name}',${pendingTxn.amount})">Pagar</button>` : ''}
+              ${pendingTxn ? `<button class="btn btn-primary btn-xs" onclick="openPaymentModal('${pendingTxn.id}','${pendingTxn.subcategory}',${pendingTxn.amount})">Pagar</button>` : ''}
               <a href="classes.html" class="btn btn-ghost btn-xs">Ver</a>
               <button class="btn btn-outline-danger btn-xs" onclick="cancelEnrollment('${e.id}','${cls?.name}')">Cancelar</button>
             </div>
@@ -256,16 +256,22 @@ function buildAdminHome(u) {
 
   const debtorRows = debtors.length === 0
     ? `<div style="text-align:center;padding:var(--space-6);color:var(--color-text-secondary)">Sin deudas pendientes 🎉</div>`
-    : debtors.map(s => `
-      <div class="list-item">
+    : debtors.map(s => {
+        const pendingTxns = MOCK_DB.transactions.filter(t => t.student_id === s.id && t.type === 'income' && t.status === 'pending');
+        const txnDetail = pendingTxns.map(t => `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--color-warning-light);color:#92400e;border-radius:4px;padding:1px 6px;font-size:11px">${t.subcategory}${t.notes?' · '+t.notes:''} — ${Utils.formatCurrency(t.amount)}</span>`).join(' ');
+        return `
+      <div class="list-item" style="align-items:flex-start">
         ${Utils.avatarHtml(s,'sm')}
         <div class="list-item-main">
           <div class="list-item-title">${s.first_name} ${s.last_name}</div>
-          <div class="list-item-sub">${s.email}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${txnDetail}</div>
         </div>
-        <span class="badge badge-danger">${Utils.formatCurrency(DB.getStudentDebt(s.id))}</span>
-        <button class="btn btn-primary btn-xs" onclick="Utils.showEmailPreview('${s.email}','Recordatorio de pago — Academia Arte y Movimiento',\`Hola ${s.first_name},\n\nTe recordamos que tienes un pago pendiente de ${Utils.formatCurrency(DB.getStudentDebt(s.id))} en la academia.\n\nPuedes realizar tu pago directamente en la academia o a través del portal de alumnos.\n\nGracias,\nAcademia Arte y Movimiento\`)">Recordatorio</button>
-      </div>`).join('');
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-2);flex-shrink:0">
+          <span class="badge badge-danger">${Utils.formatCurrency(DB.getStudentDebt(s.id))}</span>
+          <button class="btn btn-outline btn-xs" onclick="Utils.showEmailPreview('${s.email}','Recordatorio de pago — Academia Arte y Movimiento',\`Hola ${s.first_name},\n\nTe recordamos que tienes un pago pendiente de ${Utils.formatCurrency(DB.getStudentDebt(s.id))} en la academia.\n\nPuedes realizar tu pago directamente en la academia o a través del portal de alumnos.\n\nGracias,\nAcademia Arte y Movimiento\`)">Recordatorio</button>
+        </div>
+      </div>`;
+      }).join('');
 
   const recentRows = recentTxns.map(t => {
     const student = t.student_id ? DB.getUser(t.student_id) : null;
@@ -348,7 +354,7 @@ function buildReceptionistHome(u) {
       ${student ? Utils.avatarHtml(student,'sm') : '<div class="avatar sm" style="background:var(--color-gray-100)">?</div>'}
       <div class="list-item-main">
         <div class="list-item-title">${student ? student.first_name + ' ' + student.last_name : '—'}</div>
-        <div class="list-item-sub">${t.subcategory}${cls ? ' · ' + cls.name : ''}</div>
+        <div class="list-item-sub">${t.subcategory}${t.notes ? ' · ' + t.notes : ''}</div>
       </div>
       <div style="text-align:right">
         <div style="font-weight:600">${Utils.formatCurrency(t.amount)}</div>
@@ -463,7 +469,7 @@ function openPaymentModal(txnId, className, amount) {
   }
   modal._txnId = txnId;
   document.getElementById('pay-amount').textContent = Utils.formatCurrency(amount);
-  document.getElementById('pay-class').textContent = 'Mensualidad · ' + className;
+  document.getElementById('pay-class').textContent = className;
   Utils.openModal('payment-modal');
 }
 

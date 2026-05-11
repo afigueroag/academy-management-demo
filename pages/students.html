@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alumnos — Academia</title>
+  <title>Estudiantes — Academia</title>
   <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/components.css">
@@ -15,7 +15,7 @@
 <script src="../js/utils.js"></script>
 <script>
 Auth.requireRole(['admin','receptionist']);
-Utils.renderAppLayout('Alumnos', 'students');
+Utils.renderAppLayout('Estudiantes', 'students');
 
 const user = Auth.getCurrentUser();
 
@@ -76,12 +76,12 @@ function renderPage() {
   main.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-6)">
       <div>
-        <h1 class="page-title">Alumnos</h1>
+        <h1 class="page-title">Estudiantes</h1>
         <p style="color:var(--color-text-muted);margin-top:var(--space-1)">Gestión de estudiantes inscritos</p>
       </div>
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn-outline" onclick="openInvitePanel()">Invitar alumno</button>
-        <button class="btn btn-primary" onclick="openCreatePanel()">+ Crear alumno</button>
+        <button class="btn btn-outline" onclick="openInvitePanel()">Invitar estudiante</button>
+        <button class="btn btn-primary" onclick="openCreatePanel()">+ Crear estudiante</button>
       </div>
     </div>
 
@@ -136,7 +136,7 @@ function renderPage() {
     <div class="side-panel-backdrop" id="invite-backdrop" onclick="closePanel('invite-panel')"></div>
     <div class="side-panel" id="invite-panel">
       <div class="side-panel-header">
-        <h3>Invitar alumno</h3>
+        <h3>Invitar estudiante</h3>
         <button class="btn btn-ghost btn-icon" onclick="closePanel('invite-panel')">✕</button>
       </div>
       <div style="padding:var(--space-5)">
@@ -147,7 +147,7 @@ function renderPage() {
         </div>
         <div class="form-group">
           <label class="label">Correo electrónico</label>
-          <input type="email" id="inv-email" class="input" placeholder="alumno@ejemplo.com">
+          <input type="email" id="inv-email" class="input" placeholder="estudiante@ejemplo.com">
         </div>
         <div class="form-group">
           <label class="label">Plan de membresía</label>
@@ -164,11 +164,11 @@ function renderPage() {
       </div>
     </div>
 
-    <!-- Panel: Crear alumno -->
+    <!-- Panel: Crear estudiante -->
     <div class="side-panel-backdrop" id="create-backdrop" onclick="closePanel('create-panel')"></div>
     <div class="side-panel" id="create-panel">
       <div class="side-panel-header">
-        <h3>Crear alumno</h3>
+        <h3>Crear estudiante</h3>
         <button class="btn btn-ghost btn-icon" onclick="closePanel('create-panel')">✕</button>
       </div>
       <div style="padding:var(--space-5);overflow-y:auto;max-height:calc(100vh - 80px)">
@@ -184,7 +184,7 @@ function renderPage() {
         </div>
         <div class="form-group">
           <label class="label">Correo electrónico</label>
-          <input type="email" id="cr-email" class="input" placeholder="alumno@ejemplo.com">
+          <input type="email" id="cr-email" class="input" placeholder="estudiante@ejemplo.com">
         </div>
         <div class="form-group">
           <label class="label">Teléfono</label>
@@ -232,25 +232,29 @@ function renderPage() {
           <label class="label">Dirección</label>
           <input type="text" id="cr-addr" class="input" placeholder="Colonia, Ciudad">
         </div>
-        <button class="btn btn-primary btn-block" onclick="createStudent()">Crear alumno</button>
+        <div class="form-group">
+          <label class="label">Condiciones especiales</label>
+          <textarea id="cr-conditions" class="input" rows="3" placeholder="Lesiones recientes, enfermedades, limitaciones físicas que el instructor deba considerar…" style="resize:vertical"></textarea>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="createStudent()">Crear estudiante</button>
       </div>
     </div>
 
-    <!-- Panel: Ver/editar alumno -->
+    <!-- Panel: Ver/editar estudiante -->
     <div class="side-panel-backdrop" id="view-backdrop" onclick="closePanel('view-panel')"></div>
     <div class="side-panel" id="view-panel" style="width:480px">
       <div class="side-panel-header">
-        <h3 id="view-panel-title">Alumno</h3>
+        <h3 id="view-panel-title">Estudiante</h3>
         <button class="btn btn-ghost btn-icon" onclick="closePanel('view-panel')">✕</button>
       </div>
       <div id="view-panel-body" style="padding:var(--space-5)"></div>
     </div>
 
-    <!-- Panel: Editar alumno -->
+    <!-- Panel: Editar estudiante -->
     <div class="side-panel-backdrop" id="edit-backdrop" onclick="closePanel('edit-panel')"></div>
     <div class="side-panel" id="edit-panel" style="width:480px">
       <div class="side-panel-header">
-        <h3 id="edit-panel-title">Editar alumno</h3>
+        <h3 id="edit-panel-title">Editar estudiante</h3>
         <button class="btn btn-ghost btn-icon" onclick="closePanel('edit-panel')">✕</button>
       </div>
       <div id="edit-panel-body" style="padding:var(--space-5);overflow-y:auto;max-height:calc(100vh - 80px)"></div>
@@ -276,14 +280,14 @@ function renderTable() {
   const wrap = document.getElementById('students-table-wrap');
   if (!wrap) return;
   if (!list.length) {
-    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Sin resultados</div><div class="empty-desc">No hay alumnos que coincidan con los filtros aplicados.</div></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Sin resultados</div><div class="empty-desc">No hay estudiantes que coincidan con los filtros aplicados.</div></div>`;
     return;
   }
   wrap.innerHTML = `
     <div class="table-responsive">
       <table class="table">
         <thead><tr>
-          <th>Alumno</th>
+          <th>Estudiante</th>
           <th>Plan / Grupos</th>
           <th>Clases</th>
           <th>Deuda</th>
@@ -335,7 +339,7 @@ function renderTable() {
         </tbody>
       </table>
     </div>
-    <div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:var(--space-3) 0">${list.length} alumno${list.length!==1?'s':''} encontrado${list.length!==1?'s':''}</div>
+    <div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:var(--space-3) 0">${list.length} estudiante${list.length!==1?'s':''} encontrado${list.length!==1?'s':''}</div>
   `;
 }
 
@@ -368,7 +372,7 @@ function sendInvite() {
   const invUrl = window.location.origin + window.location.pathname.replace('students.html','accept-invitation.html') + '?token=' + token;
   Utils.showEmailPreview(email, 'Te invitamos a unirte a Academia Arte y Movimiento',
     `<p>Hola <strong>${name}</strong>,</p>
-    <p>Has sido invitado a unirte a <strong>Academia Arte y Movimiento</strong> como alumno.</p>
+    <p>Has sido invitado a unirte a <strong>Academia Arte y Movimiento</strong> como estudiante.</p>
     <p>Haz clic en el botón de abajo para completar tu registro:</p>
     <p><a href="${invUrl}" style="background:#6366f1;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Aceptar invitación</a></p>
     <p style="color:#888;font-size:12px">Este enlace expira en 72 horas.</p>`
@@ -382,6 +386,7 @@ function createStudent() {
   if (!first || !last || !email) { Utils.toast('Campos requeridos','Completa nombre, apellido y correo','error'); return; }
   const planId = document.getElementById('cr-plan').value;
   const groups = MOCK_DB.axes.map(ax => document.querySelector(`input[name="cr-grp-${ax.id}"]:checked`)?.value).filter(Boolean);
+  const conditions = document.getElementById('cr-conditions').value.trim();
   const newUser = {
     id: 'user_' + (MOCK_DB.users.length + 1).toString().padStart(3,'0'),
     email, first_name: first, last_name: last,
@@ -395,11 +400,12 @@ function createStudent() {
     start_date: document.getElementById('cr-start').value || new Date().toISOString().split('T')[0],
     payment_method: document.getElementById('cr-method').value,
     plan_id: planId || null,
-    groups
+    groups,
+    conditions: conditions || null
   };
   MOCK_DB.users.push(newUser);
   closePanel('create-panel');
-  Utils.toast('Alumno creado', `${first} ${last} ha sido registrado`, 'success');
+  Utils.toast('Estudiante creado', `${first} ${last} ha sido registrado`, 'success');
   renderPage();
 }
 
@@ -411,7 +417,10 @@ function openViewPanel(userId) {
   const debt = DB.getStudentDebt(s.id);
   const att = DB.getAttendanceRate(s.id);
   const enrolls = DB.getEnrollmentsForStudent(s.id).filter(e => e.status==='active');
-  const txns = MOCK_DB.transactions.filter(t => t.student_id === s.id).slice(0,5);
+  const txns = MOCK_DB.transactions.filter(t => t.student_id === s.id).slice(0,6);
+  const pendingTxns = MOCK_DB.transactions.filter(t => t.student_id === s.id && t.type === 'income' && t.status === 'pending');
+  const statusLabel = { succeeded: 'Pagado', pending: 'Pendiente', failed: 'Fallido', refunded: 'Reembolsado' };
+  const statusColor = { succeeded: 'var(--color-success)', pending: 'var(--color-warning)', failed: 'var(--color-danger)', refunded: 'var(--color-text-muted)' };
   document.getElementById('view-panel-body').innerHTML = `
     <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-5)">
       ${Utils.avatarHtml(s, 56)}
@@ -424,10 +433,16 @@ function openViewPanel(userId) {
         </div>
       </div>
     </div>
+    ${s.conditions ? `<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-5);display:flex;gap:var(--space-2)"><span>⚠️</span><div><strong style="font-size:var(--text-sm)">Condiciones especiales:</strong><p style="margin:var(--space-1) 0 0;font-size:var(--text-sm);color:#92400e">${s.conditions}</p></div></div>` : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5)">
       <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
-        <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Deuda pendiente</div>
-        <div style="font-size:var(--text-xl);font-weight:700;color:${debt>0?'var(--color-danger)':'var(--color-success)'}">${debt>0?Utils.formatCurrency(debt):'Sin deuda'}</div>
+        <div style="font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-1)">Deuda pendiente</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:${debt>0?'var(--color-danger)':'var(--color-success)'};margin-bottom:${debt>0?'var(--space-2)':'0'}">${debt>0?Utils.formatCurrency(debt):'Sin deuda'}</div>
+        ${pendingTxns.map(t => `
+          <div style="display:flex;justify-content:space-between;align-items:center;background:#fef3c7;border:1px solid #fde68a;border-radius:3px;padding:2px 6px;margin-top:3px;font-size:11px">
+            <span style="color:#92400e">${t.subcategory}${t.notes?' · '+t.notes:''}</span>
+            <span style="font-weight:600;color:#92400e;white-space:nowrap;margin-left:4px">${Utils.formatCurrency(t.amount)}</span>
+          </div>`).join('')}
       </div>
       <div style="background:var(--color-bg);padding:var(--space-3);border-radius:var(--radius-md)">
         <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Asistencia</div>
@@ -444,15 +459,21 @@ function openViewPanel(userId) {
     <div style="margin-bottom:var(--space-5)">
       <div style="font-weight:600;margin-bottom:var(--space-3)">Últimas transacciones</div>
       ${txns.length ? txns.map(t => `
-        <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
-          <span style="font-size:var(--text-sm)">${t.description || t.subcategory || '—'}</span>
-          <span style="font-weight:600;color:${t.status==='succeeded'?'var(--color-success)':'var(--color-warning)'}">${Utils.formatCurrency(t.amount)}</span>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)">
+          <div>
+            <div style="font-size:var(--text-sm)">${t.subcategory || '—'}${t.notes?' <span style="color:var(--color-text-muted)">· '+t.notes+'</span>':''}</div>
+            <div style="font-size:11px;color:var(--color-text-muted)">${Utils.formatDate(t.due_date||t.created_at)}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:var(--space-2)">
+            <div style="font-weight:600;color:${statusColor[t.status]||'inherit'}">${Utils.formatCurrency(t.amount)}</div>
+            <div style="font-size:10px;color:${statusColor[t.status]||'inherit'}">${statusLabel[t.status]||t.status}</div>
+          </div>
         </div>
       `).join('') : '<p style="color:var(--color-text-muted);font-size:var(--text-sm)">Sin transacciones</p>'}
     </div>
     <div style="display:flex;flex-direction:column;gap:var(--space-3)">
       ${debt > 0 ? `<button class="btn btn-primary" onclick="openPayModal('${s.id}');closePanel('view-panel')">Registrar pago — ${Utils.formatCurrency(debt)}</button>` : ''}
-      <button class="btn btn-outline" onclick="openEditPanel('${s.id}');closePanel('view-panel')">Editar alumno</button>
+      <button class="btn btn-outline" onclick="openEditPanel('${s.id}');closePanel('view-panel')">Editar estudiante</button>
     </div>
   `;
   document.getElementById('view-backdrop').classList.add('open');
@@ -525,9 +546,13 @@ function openEditPanel(userId) {
       <label class="label">Dirección</label>
       <input type="text" id="ed-addr" class="input" value="${s.address||''}">
     </div>
+    <div class="form-group">
+      <label class="label">Condiciones especiales</label>
+      <textarea id="ed-conditions" class="input" rows="3" placeholder="Lesiones recientes, enfermedades, limitaciones físicas que el instructor deba considerar…" style="resize:vertical">${s.conditions||''}</textarea>
+    </div>
     <button class="btn btn-primary btn-block" onclick="saveStudent('${s.id}')">Guardar cambios</button>
     <hr style="margin:var(--space-5) 0;border:none;border-top:1px solid var(--color-border)">
-    <button class="btn ${s.is_active?'btn-outline-danger':'btn-success'} btn-block" onclick="toggleStudent('${s.id}',${!s.is_active});closePanel('edit-panel')">${s.is_active?'Desactivar alumno':'Activar alumno'}</button>
+    <button class="btn ${s.is_active?'btn-outline-danger':'btn-success'} btn-block" onclick="toggleStudent('${s.id}',${!s.is_active});closePanel('edit-panel')">${s.is_active?'Desactivar estudiante':'Activar estudiante'}</button>
   `;
   document.getElementById('edit-backdrop').classList.add('open');
   document.getElementById('edit-panel').classList.add('open');
@@ -546,8 +571,9 @@ function saveStudent(userId) {
   s.payment_method = document.getElementById('ed-method').value;
   s.plan_id = document.getElementById('ed-plan').value || null;
   s.groups = MOCK_DB.axes.map(ax => document.querySelector(`input[name="ed-grp-${ax.id}"]:checked`)?.value).filter(Boolean);
+  s.conditions = document.getElementById('ed-conditions').value.trim() || null;
   closePanel('edit-panel');
-  Utils.toast('Alumno actualizado', `${s.first_name} ${s.last_name} fue actualizado correctamente.`, 'success');
+  Utils.toast('Estudiante actualizado', `${s.first_name} ${s.last_name} fue actualizado correctamente.`, 'success');
   renderPage();
 }
 
@@ -558,7 +584,7 @@ function openPayModal(userId) {
   document.getElementById('pay-modal-body').innerHTML = `
     ${debt > 0
       ? `<div class="alert alert-warning" style="margin-bottom:var(--space-4)"><span class="alert-icon">⚠️</span><div>Deuda pendiente: <strong>${Utils.formatCurrency(debt)}</strong></div></div>`
-      : `<div class="alert alert-primary" style="margin-bottom:var(--space-4)"><span class="alert-icon">💡</span><div>El alumno está al corriente. Este pago se registrará como <strong>adelanto</strong>.</div></div>`}
+      : `<div class="alert alert-primary" style="margin-bottom:var(--space-4)"><span class="alert-icon">💡</span><div>El estudiante está al corriente. Este pago se registrará como <strong>adelanto</strong>.</div></div>`}
     <div class="form-group">
       <label class="label">Concepto</label>
       <input type="text" id="pm-desc" class="input" value="${debt > 0 ? 'Pago mensualidad' : 'Pago adelantado'}" />
@@ -604,9 +630,9 @@ function processManualPayment(userId) {
 function toggleStudent(userId, active) {
   const s = DB.getUser(userId);
   if (!s) return;
-  if (!active && !confirm(`¿Desactivar a ${s.first_name} ${s.last_name}? El alumno no podrá acceder a la plataforma.`)) return;
+  if (!active && !confirm(`¿Desactivar a ${s.first_name} ${s.last_name}? El estudiante no podrá acceder a la plataforma.`)) return;
   s.is_active = active;
-  Utils.toast(active ? 'Alumno activado' : 'Alumno desactivado', `${s.first_name} ${s.last_name} ha sido ${active?'activado':'desactivado'}`, active?'success':'warning');
+  Utils.toast(active ? 'Estudiante activado' : 'Estudiante desactivado', `${s.first_name} ${s.last_name} ha sido ${active?'activado':'desactivado'}`, active?'success':'warning');
   renderPage();
 }
 
